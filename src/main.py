@@ -52,6 +52,7 @@ async def read_doctors(db: async_session = Depends(get_session)):
         print(user_obj)
 
 
+
 # @app.get("/doctors/", response_model=list[DoctorItem])
 # async def read_doctors(skip: int = 0, limit: int = 10, db: async_session = Depends(get_session)):
 #     return db.execute(select(DoctorORM).offset(skip).limit(limit)).all()
