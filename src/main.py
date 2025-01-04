@@ -31,7 +31,7 @@ async def get_session():
         yield session
 
 @app.post("/doctors", response_model=DoctorItem, tags=["doctor"])
-async def create_doctors(data: DoctorItemCreate, db: Annotated[AsyncSession, Depends(get_session)]):
+async def create_doctors(data: DoctorItem, db: Annotated[AsyncSession, Depends(get_session)]):
     doctor = DoctorORM(name=data.name, surname=data.surname,age=data.age, specialization=data.specialization, category=data.category)
     db.add(doctor)
     await db.commit()
@@ -50,7 +50,7 @@ async def read_doctor(doctor_id: str, db: Annotated[AsyncSession, Depends(get_se
         doctor = result.scalars().first()
         if not doctor:
             raise HTTPException(status_code=404, detail="Doctor not found")
-        return DoctorItem(id=doctor.id, name=doctor.name, surname=doctor.surname,age=doctor.age, specialization=doctor.specialization, category=doctor.category)
+        return DoctorItem(id=doctor.id, name=doctor.name, surname=doctor.surname, age=doctor.age, specialization=doctor.specialization, category=doctor.category)
 
 @app.patch("/doctors/{doctor_id}", response_model=DoctorItem, tags=["doctor"])
 async def update_doctor(doctor_id: str, doctor: DoctorItem, db: Annotated[AsyncSession, Depends(get_session)]):
@@ -59,6 +59,7 @@ async def update_doctor(doctor_id: str, doctor: DoctorItem, db: Annotated[AsyncS
         if not existing_doctor:
             raise HTTPException(status_code=404, detail="Doctor not found")
 
+        existing_doctor.id = doctor.id
         existing_doctor.name = doctor.name
         existing_doctor.surname = doctor.surname
         existing_doctor.age = doctor.age
@@ -76,11 +77,11 @@ async def delete_doctor(doctor_id: str, db: Annotated[AsyncSession, Depends(get_
                 raise HTTPException(status_code=404, detail="Doctor not found")
             await db.delete(doctor)
             await db.commit()
-            return DoctorItem(id=doctor.id, name=doctor.name, age=doctor.age, specialization=doctor.specialization, category=doctor.category)
+            return DoctorItem(id=doctor.id, name=doctor.name, surname=doctor.name, age=doctor.age, specialization=doctor.specialization, category=doctor.category)
 
 
 @app.post("/clients", response_model=ClientItem, tags=["client"])
-async def create_clients(data: ClientItemCreate, db: Annotated[AsyncSession, Depends(get_session)]):
+async def create_clients(data: ClientItem, db: Annotated[AsyncSession, Depends(get_session)]):
     client = ClientORM(name=data.name, surname=data.surname, email=data.email, age=data.age, phone=data.phone)
     db.add(client)
     await db.commit()
@@ -108,6 +109,7 @@ async def update_client(client_id: str, client: ClientItem, db: Annotated[AsyncS
         if not existing_client:
             raise HTTPException(status_code=404, detail="Client not found")
 
+        existing_client.id = client.id
         existing_client.name = client.name
         existing_client.surname = client.surname
         existing_client.email = client.email
