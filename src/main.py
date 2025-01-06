@@ -4,8 +4,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from database import engine, Base, DoctorORM, ClientORM, async_session
-from model import DoctorItem, DoctorItemCreate, ClientItem, ClientItemCreate
-
+from model import DoctorItem, ClientItem
 from sqlmodel import select
 
 
@@ -32,52 +31,53 @@ async def get_session():
 
 @app.post("/doctors", response_model=DoctorItem, tags=["doctor"])
 async def create_doctors(data: DoctorItem, db: Annotated[AsyncSession, Depends(get_session)]):
-    doctor = DoctorORM(name=data.name, surname=data.surname,age=data.age, specialization=data.specialization, category=data.category)
+    doctor = DoctorORM(name=data.name, surname=data.surname, age=data.age, specialization=data.specialization, category=data.category)
     db.add(doctor)
     await db.commit()
     await db.refresh(doctor)
-    return DoctorItem(id=data.id, name=data.name, surname=data.surname,age=data.age, specialization=data.specialization, category=data.category)
+    return doctor
 
 @app.get("/doctors/", response_model=list[DoctorItem], tags=["doctor"])
 async def read_doctors(db: Annotated[AsyncSession, Depends(get_session)]):
-        result = await db.execute(select(DoctorORM))
-        doctors = result.scalars().all()
-        return [DoctorItem(id=doctor.id, name=doctor.name, surname=doctor.surname,age=doctor.age, specialization=doctor.specialization, category=doctor.category) for doctor in doctors]
+    result = await db.execute(select(DoctorORM))
+    doctors = result.scalars().all()
+    return doctors
 
 @app.get("/doctors/{doctor_id}", response_model=DoctorItem, tags=["doctor"])
 async def read_doctor(doctor_id: str, db: Annotated[AsyncSession, Depends(get_session)]):
-        result = await db.execute(select(DoctorORM).filter(DoctorORM.id == doctor_id))
-        doctor = result.scalars().first()
-        if not doctor:
-            raise HTTPException(status_code=404, detail="Doctor not found")
-        return DoctorItem(id=doctor.id, name=doctor.name, surname=doctor.surname, age=doctor.age, specialization=doctor.specialization, category=doctor.category)
+    result = await db.execute(select(DoctorORM).filter(DoctorORM.id == doctor_id))
+    doctor = result.scalars().first()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+    return doctor
 
 @app.patch("/doctors/{doctor_id}", response_model=DoctorItem, tags=["doctor"])
 async def update_doctor(doctor_id: str, doctor: DoctorItem, db: Annotated[AsyncSession, Depends(get_session)]):
-        result = await db.execute(select(DoctorORM).filter(DoctorORM.id == doctor_id))
-        existing_doctor = result.scalars().first()
-        if not existing_doctor:
-            raise HTTPException(status_code=404, detail="Doctor not found")
+    result = await db.execute(select(DoctorORM).filter(DoctorORM.id == doctor_id))
+    existing_doctor = result.scalars().first()
+    if not existing_doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
 
-        existing_doctor.id = doctor.id
-        existing_doctor.name = doctor.name
-        existing_doctor.surname = doctor.surname
-        existing_doctor.age = doctor.age
-        existing_doctor.specialization = doctor.specialization
-        existing_doctor.category = doctor.category
-        await db.commit()
-        await db.refresh(existing_doctor)
-        return DoctorItem(id=doctor.id, name=doctor.name, age=doctor.age, category=doctor.category)
+    existing_doctor.id = doctor.id
+    existing_doctor.name = doctor.name
+    existing_doctor.surname = doctor.surname
+    existing_doctor.age = doctor.age
+    existing_doctor.specialization = doctor.specialization
+    existing_doctor.category = doctor.category
+    await db.commit()
+    await db.refresh(existing_doctor)
+    return existing_doctor
 
-@app.delete("/doctors/{doctor_id}", response_model=DoctorItem, tags=["doctor"])
+
+@app.delete("/doctors/{doctor_id}", tags=["doctor"])
 async def delete_doctor(doctor_id: str, db: Annotated[AsyncSession, Depends(get_session)]):
-            result = await db.execute(select(DoctorORM).filter(DoctorORM.id == doctor_id))
-            doctor = result.scalars().first()
-            if not doctor:
-                raise HTTPException(status_code=404, detail="Doctor not found")
-            await db.delete(doctor)
-            await db.commit()
-            return DoctorItem(id=doctor.id, name=doctor.name, surname=doctor.name, age=doctor.age, specialization=doctor.specialization, category=doctor.category)
+    result = await db.execute(select(DoctorORM).filter(DoctorORM.id == doctor_id))
+    doctor = result.scalars().first()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+    await db.delete(doctor)
+    await db.commit()
+    return {"message": "Doctor deleted"}
 
 
 @app.post("/clients", response_model=ClientItem, tags=["client"])
@@ -86,45 +86,45 @@ async def create_clients(data: ClientItem, db: Annotated[AsyncSession, Depends(g
     db.add(client)
     await db.commit()
     await db.refresh(client)
-    return ClientItem(id=data.id, name=data.name, surname=data.surname, email=data.email, age=data.age, phone=data.phone)
+    return client
 
 @app.get("/clients/", response_model=list[ClientItem], tags=["client"])
 async def read_clients(db: Annotated[AsyncSession, Depends(get_session)]):
-        result = await db.execute(select(ClientORM))
-        clients = result.scalars().all()
-        return [ClientItem(id=client.id, name=client.name, surname=client.surname, email=client.email, age=client.age, phone=client.phone) for client in clients]
+    result = await db.execute(select(ClientORM))
+    clients = result.scalars().all()
+    return clients
 
 @app.get("/clients/{client_id}", response_model=ClientItem, tags=["client"])
 async def read_client(client_id: str, db: Annotated[AsyncSession, Depends(get_session)]):
-        result = await db.execute(select(ClientORM).filter(ClientORM.id == client_id))
-        client = result.scalars().first()
-        if not client:
-            raise HTTPException(status_code=404, detail="Client not found")
-        return ClientItem(id=client.id, name=client.name, surname=client.surname, email=client.email, age=client.age, phone=client.phone)
+    result = await db.execute(select(ClientORM).filter(ClientORM.id == client_id))
+    client = result.scalars().first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return client
 
 @app.patch("/clients/{client_id}", response_model=ClientItem, tags=["client"])
 async def update_client(client_id: str, client: ClientItem, db: Annotated[AsyncSession, Depends(get_session)]):
-        result = await db.execute(select(ClientORM).filter(ClientORM.id == client_id))
-        existing_client = result.scalars().first()
-        if not existing_client:
-            raise HTTPException(status_code=404, detail="Client not found")
+    result = await db.execute(select(ClientORM).filter(ClientORM.id == client_id))
+    existing_client = result.scalars().first()
+    if not existing_client:
+        raise HTTPException(status_code=404, detail="Client not found")
 
-        existing_client.id = client.id
-        existing_client.name = client.name
-        existing_client.surname = client.surname
-        existing_client.email = client.email
-        existing_client.age = client.age
-        existing_client.phone = client.phone
-        await db.commit()
-        await db.refresh(existing_client)
-        return ClientItem(id=client.id, name=client.name, surname=client.surname, email=client.email, age=client.age, phone=client.phone)
+    existing_client.id = client.id
+    existing_client.name = client.name
+    existing_client.surname = client.surname
+    existing_client.email = client.email
+    existing_client.age = client.age
+    existing_client.phone = client.phone
+    await db.commit()
+    await db.refresh(existing_client)
+    return existing_client
 
-@app.delete("/clients/{client_id}", response_model=ClientItem, tags=["client"])
+@app.delete("/clients/{client_id}", tags=["client"])
 async def delete_client(client_id: str, db: Annotated[AsyncSession, Depends(get_session)]):
-            result = await db.execute(select(ClientORM).filter(ClientORM.id == client_id))
-            client = result.scalars().first()
-            if not client:
-                raise HTTPException(status_code=404, detail="Client not found")
-            await db.delete(client)
-            await db.commit()
-            return ClientItem(id=client.id, name=client.name, surname=client.surname, email=client.email, age=client.age, phone=client.phone)
+    result = await db.execute(select(ClientORM).filter(ClientORM.id == client_id))
+    client = result.scalars().first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    await db.delete(client)
+    await db.commit()
+    return {"message": "Client deleted"}

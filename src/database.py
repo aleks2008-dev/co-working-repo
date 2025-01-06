@@ -24,7 +24,6 @@ class DoctorORM(Base):
     category: Mapped[CategoryEnum]
 
     appointments = relationship("AppointmentORM", back_populates="doctor")
-    #doctors = relationship("doctors", back_populates="appointments")
 
 class ClientORM(Base):
     __tablename__ = "clients"
@@ -36,7 +35,6 @@ class ClientORM(Base):
     phone: Mapped[int] = mapped_column(unique=True, nullable=False, index=True)
 
     appointments = relationship("AppointmentORM", back_populates="client")
-    #clients = relationship("clients", back_populates="appointments")
 
 
 class RoomORM(Base):
@@ -45,7 +43,6 @@ class RoomORM(Base):
     number: Mapped[int]
 
     appointments = relationship("AppointmentORM", back_populates="room")
-    #rooms = relationship("rooms", back_populates="appointments")
 
 
 class AppointmentORM(Base):
