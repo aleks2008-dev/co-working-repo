@@ -25,4 +25,3 @@ ENV PYTHONPATH=$APP_DIR
 RUN chown -R "$USER":"$USER" $APP_DIR
 USER $USER
 
-#CMD ["uvicorn", "main:app", "--host", "0.0.0.0"]
