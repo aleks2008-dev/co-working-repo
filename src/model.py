@@ -1,6 +1,6 @@
 from enum import StrEnum
 from uuid import UUID
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 
 
 class CategoryEnum(StrEnum):
@@ -16,20 +16,38 @@ class DoctorItemCreate(BaseModel):
     age: int = Field(ge=0)
     specialization: str = Field(min_length=3)
     category: CategoryEnum
+    password: str
 
 class DoctorItem(DoctorItemCreate):
     id: UUID
 
+class DoctorItemUpdate:
+    name: str | None
+    surname: str | None
+    age: int | None
+    specialization: str | None
+    category: str | None
+    password: str | None
+
+class DoctorInDB(DoctorItemCreate):
+    hashed_password: str
 
 class ClientItemCreate(BaseModel):
     name: str = Field(max_length=10)
     surname: str = Field(max_length=10)
-    email: str = Field(max_length=10)
+    email: EmailStr
     age: int = Field(0, ge=0, le=100)
     phone: int = Field(8)
 
 class ClientItem(ClientItemCreate):
     id: UUID
+
+class ClientItemUpdate:
+    name: str | None
+    surname: str | None
+    email: str | None
+    age: int | None
+    phone: int | None
 
 class RoomItemCreate(BaseModel):
     number: int = Field(0, ge=0, le=100)
@@ -42,3 +60,10 @@ class AppointmentItemCreate(BaseModel):
 
 class AppointmentItem(AppointmentItemCreate):
     id: UUID
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: str | None = None
