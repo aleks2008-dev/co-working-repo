@@ -1,10 +1,10 @@
 from contextlib import asynccontextmanager
 from typing import Annotated
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from database import engine, Base, DoctorORM, async_session
-from model import DoctorItem, ClientItem
+from model import DoctorItem, ClientItem, DoctorItemCreate, ClientItemCreate
 from auth import verify_password, create_access_token
 from crud import get_doctors, get_doctor, get_client, get_clients, update_doctor, update_client, delete_doctor, delete_client, create_doctor, create_client
 
@@ -50,8 +50,8 @@ async def login(data: DoctorItem, db: Annotated[AsyncSession, Depends(get_sessio
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/doctors/", response_model=list[DoctorItem], tags=["doctor"])
-async def read_doctors(db: Annotated[AsyncSession, Depends(get_session)]):
-    return await get_doctors(db)
+async def read_doctors(db: Annotated[AsyncSession, Depends(get_session)], page: int = Query(ge=0, default=0), size: int = Query(ge=1, le=100)) -> list:
+    return await get_doctors(db, page, size)
 
 @app.get("/doctors/{doctor_id}", response_model=DoctorItem, tags=["doctor"])
 async def read_doctor(doctor_id: str, db: Annotated[AsyncSession, Depends(get_session)]):
@@ -60,9 +60,10 @@ async def read_doctor(doctor_id: str, db: Annotated[AsyncSession, Depends(get_se
         raise HTTPException(status_code=404, detail="Doctor not found")
     return doctor
 
-@app.patch("/doctors/{doctor_id}", response_model=DoctorItem, tags=["doctor"])
-async def doctor_update(doctor_id: str, doctor: DoctorItem, db: Annotated[AsyncSession, Depends(get_session)]):
+@app.patch("/doctors/{doctor_id}", response_model=DoctorItemCreate, tags=["doctor"])
+async def doctor_update(doctor_id: str, doctor: DoctorItemCreate, db: Annotated[AsyncSession, Depends(get_session)]):
     return await update_doctor(db, doctor_id, doctor)
+
 
 @app.delete("/doctors/{doctor_id}", tags=["doctor"])
 async def doctor_delete(doctor_id: str, db: Annotated[AsyncSession, Depends(get_session)]):
@@ -76,8 +77,8 @@ async def client_create(data: ClientItem, db: Annotated[AsyncSession, Depends(ge
     return await create_client(db, data)
 
 @app.get("/clients/", response_model=list[ClientItem], tags=["client"])
-async def read_clients(db: Annotated[AsyncSession, Depends(get_session)]):
-    return await get_clients(db)
+async def read_clients(db: Annotated[AsyncSession, Depends(get_session)], page: int = Query(ge=0, default=0), size: int = Query(ge=1, le=100)) -> list:
+    return await get_clients(db, page, size)
 
 @app.get("/clients/{client_id}", response_model=ClientItem, tags=["client"])
 async def read_client(client_id: str, db: Annotated[AsyncSession, Depends(get_session)]):
@@ -86,8 +87,8 @@ async def read_client(client_id: str, db: Annotated[AsyncSession, Depends(get_se
         raise HTTPException(status_code=404, detail="Client not found")
     return client
 
-@app.patch("/clients/{client_id}", response_model=ClientItem, tags=["client"])
-async def client_update(client_id: str, client: ClientItem, db: Annotated[AsyncSession, Depends(get_session)]):
+@app.patch("/clients/{client_id}", response_model=ClientItemCreate, tags=["client"])
+async def client_update(client_id: str, client: ClientItemCreate, db: Annotated[AsyncSession, Depends(get_session)]):
     return await update_client(db, client_id, client)
 
 @app.delete("/clients/{client_id}", tags=["client"])

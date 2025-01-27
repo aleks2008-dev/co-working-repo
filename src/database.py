@@ -33,7 +33,7 @@ class ClientORM(Base):
     surname: Mapped[str]
     email: Mapped [str | None] = mapped_column(unique=True)
     age: Mapped[int]
-    phone: Mapped[int] = mapped_column(unique=True)
+    phone: Mapped[str] = mapped_column(unique=True)
 
     appointments: Mapped["AppointmentORM"] = relationship(back_populates="client", lazy="joined")
 

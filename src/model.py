@@ -37,7 +37,7 @@ class ClientItemCreate(BaseModel):
     surname: str = Field(max_length=10)
     email: EmailStr
     age: int = Field(0, ge=0, le=100)
-    phone: int = Field(8)
+    phone: str = Field(max_length=10)
 
 class ClientItem(ClientItemCreate):
     id: UUID
@@ -47,7 +47,7 @@ class ClientItemUpdate:
     surname: str | None
     email: str | None
     age: int | None
-    phone: int | None
+    phone: str | None
 
 class RoomItemCreate(BaseModel):
     number: int = Field(0, ge=0, le=100)
