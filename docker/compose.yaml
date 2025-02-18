@@ -31,7 +31,7 @@ services:
     image: postgres:17
     container_name: postgres-db-test
     ports:
-      - "5491:5432"
+      - "5491:5430"
     environment:
       POSTGRES_USER: doctors
       POSTGRES_PASSWORD: doctors

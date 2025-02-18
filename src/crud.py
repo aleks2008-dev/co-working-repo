@@ -3,7 +3,6 @@ from sqlalchemy.future import select
 from database import DoctorORM, ClientORM
 from model import DoctorItemUpdate, ClientItemUpdate, DoctorItem, ClientItem
 from auth import get_password_hash
-from fastapi import Query
 
 async def create_doctor(db: AsyncSession, data: DoctorItem):
     hashed_password = get_password_hash(data.password)
@@ -24,25 +23,19 @@ async def get_doctor(db: AsyncSession, doctor_id: str):
     doctor = result.scalars().first()
     return doctor
 
-async def update_doctor(db: AsyncSession, doctor_id: int, doctor_update: DoctorItemUpdate):
-    doctor = await get_doctor(db, doctor_id)
-    if not doctor:
+async def update_doctor_dump(db: AsyncSession, doctor_id: int, doctor_update: DoctorItemUpdate):
+    db_doctor = await get_doctor(db, doctor_id)
+    if not db_doctor:
         return None
-    if doctor_update.name is not None:
-        doctor.name = doctor_update.name
-    if doctor_update.surname is not None:
-        doctor.surname = doctor_update.surname
-    if doctor_update.age is not None:
-        doctor.age = doctor_update.age
-    if doctor_update.specialization is not None:
-        doctor.specialization = doctor_update.specialization
-    if doctor_update.category is not None:
-        doctor.category = doctor_update.category
-    if doctor_update.password is not None:
-        doctor.password = doctor_update.password
+
+    update_data = doctor_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_doctor, field, value)
+
+    db.add(db_doctor)
     await db.commit()
-    await db.refresh(doctor)
-    return doctor
+    await db.refresh(db_doctor)
+    return db_doctor
 
 async def delete_doctor(db: AsyncSession, doctor_id: int):
     doctor = await get_doctor(db, doctor_id)
@@ -70,23 +63,19 @@ async def get_client(db: AsyncSession, client_id: str):
     client = result.scalars().first()
     return client
 
-async def update_client(db: AsyncSession, client_id: int, client_update: ClientItemUpdate):
-    client = await get_client(db, client_id)
-    if not client:
+async def update_client_dump(db: AsyncSession, client_id: int, client_update: ClientItemUpdate):
+    db_client = await get_client(db, client_id)
+    if not db_client:
         return None
-    if client_update.name is not None:
-        client.name = client_update.name
-    if client_update.surname is not None:
-        client.surname = client_update.surname
-    if client_update.email is not None:
-        client.email = client_update.email
-    if client_update.age is not None:
-        client.age = client_update.age
-    if client_update.phone is not None:
-        client.phone = client_update.phone
+
+    update_data = client_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_client, field, value)
+
+    db.add(db_client)
     await db.commit()
-    await db.refresh(client)
-    return client
+    await db.refresh(db_client)
+    return db_client
 
 async def delete_client(db: AsyncSession, client_id: int):
     client = await get_client(db, client_id)
