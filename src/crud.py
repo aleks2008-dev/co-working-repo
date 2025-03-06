@@ -3,18 +3,35 @@ from sqlalchemy.future import select
 from database import DoctorORM, ClientORM
 from model import DoctorItemUpdate, ClientItemUpdate, DoctorItem, ClientItem
 from auth import get_password_hash
+from uuid import UUID
+from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 
 async def create_doctor(db: AsyncSession, data: DoctorItem):
     hashed_password = get_password_hash(data.password)
     doctor = DoctorORM(name=data.name, surname=data.surname, age=data.age, specialization=data.specialization,
                        category=data.category, password=hashed_password)
-    db.add(doctor)
-    await db.commit()
-    await db.refresh(doctor)
+    try:
+        db.add(doctor)
+        await db.commit()
+        await db.refresh(doctor)
+    except IntegrityError as e:
+        await db.rollback()
+
+        error_msg = "Database integrity error"
+        if "unique constraint" in str(e).lower():
+            error_msg = "Duplicate entry. Doctor with these details already exists"
+        elif "foreign key constraint" in str(e).lower():
+            error_msg = "Invalid reference in foreign key"
+
+        raise HTTPException(
+            status_code=409,
+            detail=error_msg
+        )
     return doctor
 
-async def get_doctors(db: AsyncSession, page: int, size: int) -> list:
-    result = await db.execute(select(DoctorORM).offset(page).limit(size))
+async def get_doctors(db: AsyncSession, page: int, size: int) -> list[DoctorORM]:
+    result = await db.execute(select(DoctorORM).order_by(DoctorORM.name.asc()).offset((page - 1) * size).limit(size))
     doctors = result.scalars().all()
     return doctors
 
@@ -23,7 +40,7 @@ async def get_doctor(db: AsyncSession, doctor_id: str):
     doctor = result.scalars().first()
     return doctor
 
-async def update_doctor_dump(db: AsyncSession, doctor_id: int, doctor_update: DoctorItemUpdate):
+async def update_doctor_dump(db: AsyncSession, doctor_id: str, doctor_update: DoctorItemUpdate):
     db_doctor = await get_doctor(db, doctor_id)
     if not db_doctor:
         return None
@@ -37,7 +54,7 @@ async def update_doctor_dump(db: AsyncSession, doctor_id: int, doctor_update: Do
     await db.refresh(db_doctor)
     return db_doctor
 
-async def delete_doctor(db: AsyncSession, doctor_id: int):
+async def delete_doctor(db: AsyncSession, doctor_id: str):
     doctor = await get_doctor(db, doctor_id)
     if not doctor:
         return None

@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import FastAPI, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-
+from uuid import UUID
 import crud
 from database import engine, Base, DoctorORM, async_session
 from model import DoctorItem, ClientItem, DoctorItemCreate, ClientItemUpdate, DoctorItemUpdate, ClientItemCreate
@@ -22,7 +22,7 @@ from crud import get_doctors, get_doctor, get_client, get_clients, update_client
 
 app = FastAPI()#lifespan=lifespan)
 
-@app.get("/healthcheck")
+@app.get("/healthcheck/")
 async def healthcheck():
     return {"status": "ok"}
 
@@ -32,7 +32,7 @@ async def get_session():
         yield session
 
 
-@app.post("/doctors", response_model=DoctorItem, tags=["doctor"])
+@app.post("/doctors/", response_model=DoctorItem, tags=["doctor"])
 async def doctor_create(data: DoctorItem, db: Annotated[AsyncSession, Depends(get_session)]):
     return await create_doctor(db, data)
 
@@ -55,7 +55,7 @@ async def read_doctors(db: Annotated[AsyncSession, Depends(get_session)], page: 
     return await get_doctors(db, page, size)
 
 @app.get("/doctors/{doctor_id}", response_model=DoctorItem, tags=["doctor"])
-async def read_doctor(doctor_id: str, db: Annotated[AsyncSession, Depends(get_session)]):
+async def read_doctor(doctor_id: UUID, db: Annotated[AsyncSession, Depends(get_session)]):
     doctor = await get_doctor(db, doctor_id)
     if not doctor:
         raise HTTPException(status_code=404, detail="Doctor not found")
@@ -64,10 +64,12 @@ async def read_doctor(doctor_id: str, db: Annotated[AsyncSession, Depends(get_se
 @app.patch("/doctors/{doctor_id}", response_model=DoctorItemCreate, tags=["doctor"])
 async def doctor_update(doctor_id: str, doctor: DoctorItemUpdate, db: Annotated[AsyncSession, Depends(get_session)]):
     db_doctor = await crud.update_doctor_dump(db, doctor_id, doctor)
+    if not db_doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
     return db_doctor
 
 @app.delete("/doctors/{doctor_id}", tags=["doctor"])
-async def doctor_delete(doctor_id: str, db: Annotated[AsyncSession, Depends(get_session)]):
+async def doctor_delete(doctor_id: UUID, db: Annotated[AsyncSession, Depends(get_session)]):
     doctor = await delete_doctor(db, doctor_id)
     if not doctor:
         raise HTTPException(status_code=404, detail="Doctor not found")

@@ -18,7 +18,7 @@ class DoctorORM(Base):
 
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str]
-    surname: Mapped[str]
+    surname: Mapped[str] = mapped_column(unique=True)
     age: Mapped[int]
     specialization: Mapped[str]
     category: Mapped[CategoryEnum]
