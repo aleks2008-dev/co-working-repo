@@ -37,7 +37,7 @@ class DoctorItemUpdate(BaseModel):
     age: StrictInt | None = Field(default=None, ge=0)
     specialization: StrictStr | None = Field(default=None, min_length=3)
     category: CategoryEnum | None = None
-    password: str | None = Field(default=None, exclude=True)
+    password: str | None = Field(default=None, min_length=5, exclude=True)
 
 class DoctorInDB(DoctorItemCreate):
     hashed_password: str

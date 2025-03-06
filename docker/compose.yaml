@@ -27,15 +27,15 @@ services:
     volumes:
       - doctors:/var/lib/postgresql/data
 
+
   postgres-db-test:
     image: postgres:17
     container_name: postgres-db-test
     ports:
-      - "5491:5430"
+      - "5491:5432"
     environment:
       POSTGRES_USER: doctors
       POSTGRES_PASSWORD: doctors
-      POSTGRES_DB: doctors
-
+      POSTGRES_DB: doctors_test
 volumes:
   doctors:
