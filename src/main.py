@@ -33,7 +33,7 @@ async def get_session():
 
 
 @app.post("/doctors/", response_model=DoctorItem, tags=["doctor"])
-async def doctor_create(data: DoctorItem, db: Annotated[AsyncSession, Depends(get_session)]):
+async def doctor_create(data: DoctorItemCreate, db: Annotated[AsyncSession, Depends(get_session)]):
     return await create_doctor(db, data)
 
 # Вход в систему
@@ -75,8 +75,8 @@ async def doctor_delete(doctor_id: UUID, db: Annotated[AsyncSession, Depends(get
         raise HTTPException(status_code=404, detail="Doctor not found")
     return {"message": "Doctor deleted"}
 
-@app.post("/clients", response_model=ClientItem, tags=["client"])
-async def client_create(data: ClientItem, db: Annotated[AsyncSession, Depends(get_session)]):
+@app.post("/clients/", response_model=ClientItem, tags=["client"])
+async def client_create(data: ClientItemCreate, db: Annotated[AsyncSession, Depends(get_session)]):
     return await create_client(db, data)
 
 @app.get("/clients/", response_model=list[ClientItem], tags=["client"])
@@ -84,7 +84,7 @@ async def read_clients(db: Annotated[AsyncSession, Depends(get_session)], page: 
     return await get_clients(db, page, size)
 
 @app.get("/clients/{client_id}", response_model=ClientItem, tags=["client"])
-async def read_client(client_id: str, db: Annotated[AsyncSession, Depends(get_session)]):
+async def read_client(client_id: UUID, db: Annotated[AsyncSession, Depends(get_session)]):
     client = await get_client(db, client_id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -93,10 +93,12 @@ async def read_client(client_id: str, db: Annotated[AsyncSession, Depends(get_se
 @app.patch("/clients/{client_id}", response_model=ClientItemCreate, tags=["client"])
 async def client_update(client_id: str, client: ClientItemUpdate, db: Annotated[AsyncSession, Depends(get_session)]):
     db_client = await crud.update_client_dump(db, client_id, client)
+    if not db_client:
+        raise HTTPException(status_code=404, detail="Client not found")
     return db_client
 
 @app.delete("/clients/{client_id}", tags=["client"])
-async def client_delete(client_id: str, db: Annotated[AsyncSession, Depends(get_session)]):
+async def client_delete(client_id: UUID, db: Annotated[AsyncSession, Depends(get_session)]):
     client = await delete_client(db, client_id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")

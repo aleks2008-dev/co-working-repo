@@ -34,30 +34,14 @@ async def setup_db(engine):
 
 @pytest_asyncio.fixture(scope="function")
 async def db_session(engine):
-    async with engine.connect() as conn:
-        await conn.begin()
-        try:
-            AsyncSessionLocal = async_sessionmaker(
-                bind=conn,
-                expire_on_commit=False,
-                autoflush=False
-            )
-            async with AsyncSessionLocal() as session:
-                yield session
-                await session.close()
-        finally:
-            await conn.rollback()
+    async_session = async_sessionmaker(engine)
+    async with async_session() as session:
+        yield session
 
 
 @pytest_asyncio.fixture(scope="function")
 async def client(db_session: AsyncSession):
-    def override_get_session():
-        return db_session
-
-    app.dependency_overrides[get_session] = override_get_session
+    app.dependency_overrides[get_session] = lambda: db_session
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as cl:
         yield cl
-
-    app.dependency_overrides.clear()
-    await cl.aclose()

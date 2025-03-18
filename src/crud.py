@@ -1,13 +1,13 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from database import DoctorORM, ClientORM
-from model import DoctorItemUpdate, ClientItemUpdate, DoctorItem, ClientItem
+from model import DoctorItemUpdate, ClientItemUpdate, DoctorItem, ClientItem, DoctorItemCreate
 from auth import get_password_hash
 from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 
-async def create_doctor(db: AsyncSession, data: DoctorItem):
+async def create_doctor(db: AsyncSession, data: DoctorItemCreate):
     hashed_password = get_password_hash(data.password)
     doctor = DoctorORM(name=data.name, surname=data.surname, age=data.age, specialization=data.specialization,
                        category=data.category, password=hashed_password)
@@ -65,13 +65,27 @@ async def delete_doctor(db: AsyncSession, doctor_id: str):
 async def create_client(db: AsyncSession, data: ClientItem):
     client = ClientORM(name=data.name, surname=data.surname, email=data.email, age=data.age,
                        phone=data.phone)
-    db.add(client)
-    await db.commit()
-    await db.refresh(client)
+    try:
+        db.add(client)
+        await db.commit()
+        await db.refresh(client)
+    except IntegrityError as e:
+        await db.rollback()
+
+        error_msg = "Database integrity error"
+        if "unique constraint" in str(e).lower():
+            error_msg = "Duplicate entry. Client with these details already exists"
+        elif "foreign key constraint" in str(e).lower():
+            error_msg = "Invalid reference in foreign key"
+
+        raise HTTPException(
+            status_code=409,
+            detail=error_msg
+        )
     return client
 
-async def get_clients(db: AsyncSession, page: int, size: int) -> list:
-    result = await db.execute(select(ClientORM).offset(page).limit(size))
+async def get_clients(db: AsyncSession, page: int, size: int) -> list[ClientORM]:
+    result = await db.execute(select(ClientORM).order_by(ClientORM.name.asc()).offset((page - 1) * size).limit(size))
     clients = result.scalars().all()
     return clients
 
@@ -80,7 +94,7 @@ async def get_client(db: AsyncSession, client_id: str):
     client = result.scalars().first()
     return client
 
-async def update_client_dump(db: AsyncSession, client_id: int, client_update: ClientItemUpdate):
+async def update_client_dump(db: AsyncSession, client_id: str, client_update: ClientItemUpdate):
     db_client = await get_client(db, client_id)
     if not db_client:
         return None

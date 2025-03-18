@@ -11,12 +11,12 @@ class CategoryEnum(StrEnum):
     NO_CATEGORY = "no_category"
 
 class DoctorItemCreate(BaseModel):
-    name: StrictStr | None = Field(default=None, min_length=3, max_length=10)
-    surname: StrictStr | None = Field(default=None, min_length=3, max_length=10)
-    age: StrictInt | None = Field(default=None, ge=0)
-    specialization: StrictStr | None = Field(default=None, min_length=3)
-    category: CategoryEnum | None = None
-    password: str | None = Field(default=None, exclude=True)
+    name: StrictStr = Field(min_length=3, max_length=10)
+    surname: StrictStr = Field(min_length=3, max_length=10)
+    age: StrictInt = Field( ge=0)
+    specialization: StrictStr = Field(min_length=3)
+    category: CategoryEnum
+    password: str = Field(exclude=True, min_length=4)
 
     @field_validator('age')
     def check_age(cls, value):
@@ -43,11 +43,11 @@ class DoctorInDB(DoctorItemCreate):
     hashed_password: str
 
 class ClientItemCreate(BaseModel):
-    name: StrictStr | None = Field(default=None, min_length=3, max_length=10)
-    surname: StrictStr | None = Field(default=None, min_length=3, max_length=10)
+    name: StrictStr = Field(min_length=3, max_length=10)
+    surname: StrictStr = Field(min_length=3, max_length=10)
     email: EmailStr | None = None
-    age: StrictInt | None = Field(default=None, ge=0)
-    phone: str
+    age: StrictInt = Field(default=None, ge=0)
+    phone: StrictStr
 
     @field_validator('phone')
     def validate_phone_number(cls, value):
@@ -77,7 +77,7 @@ class ClientItemUpdate(BaseModel):
     surname: StrictStr | None = Field(default=None, min_length=3, max_length=10)
     email: EmailStr | None = None
     age: StrictInt | None = Field(default=None, ge=0)
-    phone: str
+    phone: StrictStr | None = Field(default=None)
 
     @field_validator('phone')
     def validate_phone_number(cls, value):
