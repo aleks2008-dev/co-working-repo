@@ -1,14 +1,16 @@
 from contextlib import asynccontextmanager
 from typing import Annotated
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
 import crud
-from database import engine, Base, DoctorORM, async_session
-from model import DoctorItem, ClientItem, DoctorItemCreate, ClientItemUpdate, DoctorItemUpdate, ClientItemCreate
+from database import engine, Base, DoctorORM, UserORM, async_session
+from model import DoctorItem, UserItem, DoctorItemCreate, UserItemUpdate, DoctorItemUpdate, UserItemCreate
 from auth import verify_password, create_access_token
-from crud import get_doctors, get_doctor, get_client, get_clients, update_client_dump, delete_doctor, delete_client, create_doctor, create_client, update_doctor_dump
+from crud import get_doctors, get_doctor, get_user, get_users, update_user_dump, delete_doctor, delete_user, create_doctor, create_user, update_doctor_dump
+from auth import RoleChecker
 
 # @asynccontextmanager
 # async def lifespan(app: FastAPI):
@@ -36,7 +38,7 @@ async def get_session():
 async def doctor_create(data: DoctorItemCreate, db: Annotated[AsyncSession, Depends(get_session)]):
     return await create_doctor(db, data)
 
-# Вход в систему
+# Вход в систему врач
 @app.post("/auth/login")
 async def login(data: DoctorItem, db: Annotated[AsyncSession, Depends(get_session)]):
     result = await db.execute(select(DoctorORM).filter(DoctorORM.name == data.name))
@@ -75,31 +77,46 @@ async def doctor_delete(doctor_id: UUID, db: Annotated[AsyncSession, Depends(get
         raise HTTPException(status_code=404, detail="Doctor not found")
     return {"message": "Doctor deleted"}
 
-@app.post("/clients/", response_model=ClientItem, tags=["client"])
-async def client_create(data: ClientItemCreate, db: Annotated[AsyncSession, Depends(get_session)]):
-    return await create_client(db, data)
+# Вход в систему User
+@app.post("/token")
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_session)):
+    result = await db.execute(select(UserORM).filter(UserORM.name == form_data.username))
+    user = result.scalar_one_or_none()
 
-@app.get("/clients/", response_model=list[ClientItem], tags=["client"])
-async def read_clients(db: Annotated[AsyncSession, Depends(get_session)], page: int = Query(ge=0, default=1), size: int = Query(ge=1, le=100, default=10)) -> list:
-    return await get_clients(db, page, size)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверное имя пользователя")
+    if not verify_password(form_data.password, user.password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Неверный пароль")
 
-@app.get("/clients/{client_id}", response_model=ClientItem, tags=["client"])
-async def read_client(client_id: UUID, db: Annotated[AsyncSession, Depends(get_session)]):
-    client = await get_client(db, client_id)
-    if not client:
-        raise HTTPException(status_code=404, detail="Client not found")
-    return client
+    # Генерация токена
+    access_token = create_access_token(data={"sub": user.name, "role": user.role.value, "disabled": user.disabled})
+    return {"access_token": access_token, "token_type": "bearer"}
 
-@app.patch("/clients/{client_id}", response_model=ClientItemCreate, tags=["client"])
-async def client_update(client_id: str, client: ClientItemUpdate, db: Annotated[AsyncSession, Depends(get_session)]):
-    db_client = await crud.update_client_dump(db, client_id, client)
-    if not db_client:
-        raise HTTPException(status_code=404, detail="Client not found")
-    return db_client
+@app.post("/users/", response_model=UserItem, tags=["user"])
+async def user_create(data: UserItemCreate, db: Annotated[AsyncSession, Depends(get_session)]):
+    return await create_user(db, data)
 
-@app.delete("/clients/{client_id}", tags=["client"])
-async def client_delete(client_id: UUID, db: Annotated[AsyncSession, Depends(get_session)]):
-    client = await delete_client(db, client_id)
-    if not client:
-        raise HTTPException(status_code=404, detail="Client not found")
-    return {"message": "Client deleted"}
+@app.get("/users/", response_model=list[UserItem], dependencies=[Depends(RoleChecker(['admin']))], tags=["user"])   #dependencies=[Depends(RoleChecker(['admin']))])
+async def read_users(db: Annotated[AsyncSession, Depends(get_session)], page: int = Query(ge=0, default=1), size: int = Query(ge=1, le=100, default=10)) -> list:
+    return await get_users(db, page, size)
+
+@app.get("/users/{user_id}", response_model=UserItem, tags=["user"])
+async def read_user(user_id: UUID, db: Annotated[AsyncSession, Depends(get_session)]):
+    user = await get_user(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+@app.patch("/users/{user_id}", response_model=UserItemCreate, tags=["user"])
+async def user_update(user_id: str, user: UserItemUpdate, db: Annotated[AsyncSession, Depends(get_session)]):
+    db_user = await crud.update_user_dump(db, user_id, user)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return db_user
+
+@app.delete("/users/{user_id}", tags=["user"])
+async def user_delete(user_id: UUID, db: Annotated[AsyncSession, Depends(get_session)]):
+    user = await delete_user(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"message": "User deleted"}

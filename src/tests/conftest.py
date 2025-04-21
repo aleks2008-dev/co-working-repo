@@ -6,11 +6,11 @@ from database import Base
 from httpx import AsyncClient
 import logging
 from httpx import ASGITransport
+from auth import create_access_token
 
 logging.basicConfig(level=logging.DEBUG)
 
-TEST_DATABASE_URL = "postgresql+asyncpg://doctors:doctors@postgres-db-test:5432/doctors"
-
+TEST_DATABASE_URL = "postgresql+asyncpg://doctors:doctors@postgres-db-test:5432/doctors_test"
 
 @pytest_asyncio.fixture(scope="session")
 async def engine():
@@ -45,3 +45,11 @@ async def client(db_session: AsyncSession):
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as cl:
         yield cl
+
+@pytest_asyncio.fixture
+def admin_token():
+    return create_access_token(data={"sub": "admin", "role": "admin"})
+
+@pytest_asyncio.fixture
+def user_token():
+    return create_access_token(data={"sub": "user", "role": "user"})

@@ -1,25 +1,28 @@
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from database import ClientORM
+from database import UserORM
 
 
 @pytest.mark.asyncio
-async def test_update_client_success(client: AsyncClient, db_session: AsyncSession):
-    client_orm = ClientORM(
+async def test_update_user_success(client: AsyncClient, db_session: AsyncSession):
+    user_orm = UserORM(
         name="John",
         surname="Doe",
         email="clientTest@example.com",
         age=40,
-        phone="+375297777777"
+        phone="+375297777777",
+        role="user",
+        password="password",
+        disabled=False
     )
-    db_session.add(client_orm)
+    db_session.add(user_orm)
     await db_session.commit()
-    await db_session.refresh(client_orm)
+    await db_session.refresh(user_orm)
 
     update_data = {"name": "Michael", "age": 45}
     response = await client.patch(
-        f"/clients/{client_orm.id}",
+        f"/users/{user_orm.id}",
         json=update_data
     )
 
@@ -29,37 +32,40 @@ async def test_update_client_success(client: AsyncClient, db_session: AsyncSessi
     assert data["age"] == 45
     assert data["surname"] == "Doe"
 
-    await db_session.refresh(client_orm)
-    assert client_orm.name == "Michael"
-    assert client_orm.age == 45
+    await db_session.refresh(user_orm)
+    assert user_orm.name == "Michael"
+    assert user_orm.age == 45
 
 
 @pytest.mark.asyncio
-async def test_update_nonexistent_client(client: AsyncClient):
+async def test_update_nonexistent_user(client: AsyncClient):
     fake_id = "00000000-0000-0000-0000-000000000000"
     response = await client.patch(
-        f"/clients/{fake_id}",
+        f"/users/{fake_id}",
         json={"name": "Test"}
     )
     assert response.status_code == 404
-    assert response.json() == {"detail": "Client not found"}
+    assert response.json() == {"detail": "User not found"}
 
 
 @pytest.mark.asyncio
 async def test_partial_update(client: AsyncClient, db_session: AsyncSession):
-    client_orm = ClientORM(
+    user_orm = UserORM(
         name="John",
         surname="Doe",
         email="clientTest@example.com",
         age=40,
-        phone="+375297777777"
+        phone="+375297777777",
+        role="user",
+        password="password",
+        disabled=False
     )
-    db_session.add(client_orm)
+    db_session.add(user_orm)
     await db_session.commit()
-    await db_session.refresh(client_orm)
+    await db_session.refresh(user_orm)
 
     response = await client.patch(
-        f"/clients/{client_orm.id}",
+        f"/users/{user_orm.id}",
         json={"age": 40 }
     )
 
@@ -71,19 +77,22 @@ async def test_partial_update(client: AsyncClient, db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_invalid_data_update(client: AsyncClient, db_session: AsyncSession):
-    client_orm = ClientORM(
+    user_orm = UserORM(
         name="John",
         surname="Doe",
         email="clientTest@example.com",
         age=40,
-        phone="+375297777777"
+        phone="+375297777777",
+        role="user",
+        password="password",
+        disabled=False
     )
-    db_session.add(client_orm)
+    db_session.add(user_orm)
     await db_session.commit()
-    await db_session.refresh(client_orm)
+    await db_session.refresh(user_orm)
 
     response = await client.patch(
-        f"/clients/{client_orm.id}",
+        f"/users/{user_orm.id}",
         json={"age": "fifty"}
     )
 

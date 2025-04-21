@@ -25,7 +25,6 @@ async def test_delete_existing_doctor(client: AsyncClient, db_session: AsyncSess
     assert response.status_code == 200
     assert response.json() == {"message": "Doctor deleted"}
 
-    # Проверяем что врач удален из БД
     result = await db_session.execute(select(DoctorORM).where(DoctorORM.id == test_doctor.id))
     assert result.scalars().first() is None
 

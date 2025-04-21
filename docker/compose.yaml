@@ -6,7 +6,11 @@ services:
     build:
       context: ../
       dockerfile: docker/Dockerfile
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--reload"]
+    command: >
+      sh -c "
+        alembic upgrade head &&
+        uvicorn main:app --host 0.0.0.0 --reload
+      "
     volumes:
       - ../src:/home/alex-user/src
     ports:
