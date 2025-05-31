@@ -31,7 +31,8 @@ def create_access_token(
 ) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=15))
-    to_encode.update({"exp": expire})
+    #to_encode.update({"exp": expire})
+    to_encode["exp"]= expire
     return jwt.encode(to_encode, secret_key, algorithm=algorithm)
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserItemCreate:
