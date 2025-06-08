@@ -123,6 +123,11 @@ celerybeat.pid
 
 # Environments
 .env
+*.env*
+.env.local
+.env.development
+.env.production
+secrets.ini
 .venv
 env/
 venv/

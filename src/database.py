@@ -4,16 +4,28 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 import uuid
 from sqlalchemy import UUID, ForeignKey, Boolean
 from model import CategoryEnum, UserRole
+import os
+from dotenv import load_dotenv
+from sqlalchemy.ext.asyncio import AsyncSession
 
-DATABASE_URL = "postgresql+asyncpg://doctors:doctors@postgres-db/doctors"
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+#DATABASE_URL = "postgresql+asyncpg://doctors:doctors@postgres-db/doctors"
 engine = create_async_engine(DATABASE_URL, echo=True)
 
 async_session = async_sessionmaker(engine)
+
+async def get_session() -> AsyncSession:
+    """Asynchronous generator that yields database sessions."""
+    async with async_session() as session:
+        yield session
 
 class Base(AsyncAttrs, DeclarativeBase):
     pass
 
 class DoctorORM(Base):
+    """Doctor database model representing medical professionals."""
     __tablename__ = "doctors"
 
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -27,6 +39,7 @@ class DoctorORM(Base):
     appointments: Mapped["AppointmentORM"] = relationship(back_populates="doctor", cascade="all, delete", passive_deletes=True, lazy="joined")
 
 class UserORM(Base):
+    """User database model representing system users with authentication."""
     __tablename__ = "users"
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str]
@@ -41,6 +54,7 @@ class UserORM(Base):
     appointments: Mapped["AppointmentORM"] = relationship(back_populates="user", cascade="all, delete", passive_deletes=True, lazy="joined")
 
 class RoomORM(Base):
+    """ ORM model representing a room in the database."""
     __tablename__ = "rooms"
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     number: Mapped[int]
@@ -48,6 +62,7 @@ class RoomORM(Base):
     appointments: Mapped["AppointmentORM"] = relationship(back_populates="room", cascade="all, delete", passive_deletes=True, lazy="joined")
 
 class AppointmentORM(Base):
+    """ORM model representing an appointment in the database."""
     __tablename__ = "appointments"
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     date: Mapped[int]

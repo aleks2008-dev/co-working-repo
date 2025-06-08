@@ -3,75 +3,95 @@ from typing import Optional, Annotated
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 import jwt
+from jose import JWTError
 from jwt import PyJWTError
 from jwt.exceptions import InvalidTokenError
 from passlib.context import CryptContext
-from model import UserItemCreate
+from model import UserItemCreate, CurrentUser
 from database import UserORM
+import os
+from dotenv import load_dotenv
+from sqlalchemy.ext.asyncio import AsyncSession
+from database import get_session
+from sqlalchemy import select
 
-SECRET_KEY = "secret"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRY_MINUTES = 30
+load_dotenv()
+
+class AuthConfig:
+    SECRET_KEY = os.getenv("SECRET_KEY")
+    if not SECRET_KEY:
+        raise ValueError("SECRET_KEY not set in environment variables")
+
+    ALGORITHM = os.getenv("ALGORITHM", "HS256")
+    ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-async def verify_password(plain_password: str, hashed_password: str):
+async def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a password against a hash."""
     return pwd_context.verify(plain_password, hashed_password)
 
-async def get_password_hash(password):
+async def get_password_hash(password) -> str:
+    """Generate a password hash."""
     return pwd_context.hash(password)
 
 def create_access_token(
     data: dict,  # Добавляем параметр data
     expires_delta: timedelta = None,
-    secret_key: str = SECRET_KEY,
-    algorithm: str = ALGORITHM
 ) -> str:
+    """Create a JWT access token."""
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=15))
-    #to_encode.update({"exp": expire})
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=AuthConfig.ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
     to_encode["exp"]= expire
-    return jwt.encode(to_encode, secret_key, algorithm=algorithm)
+    return jwt.encode(to_encode, AuthConfig.SECRET_KEY, algorithm=AuthConfig.ALGORITHM)
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserItemCreate:
+async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_session)) -> CurrentUser:
+    """Get the current authenticated user from the JWT token."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, AuthConfig.SECRET_KEY, algorithms=[AuthConfig.ALGORITHM])
         username: str = payload.get("sub")
-        surname: str = payload.get("surname")
-        phone: str = payload.get("phone")
-        role = payload.get("role")
-        disabled: bool = payload.get("disabled", False)
-        password: str = payload.get("password")
-        if not username or not role:
+        if username is None:
             raise credentials_exception
-
-        return UserItemCreate(  # Возвращаем объект модели
-            username=username,
-            surname=surname,
-            phone=phone,
-            role=role,
-            disabled=disabled,
-            password=password
-        )
-    except InvalidTokenError:
+    except JWTError:
         raise credentials_exception
 
-async def get_current_active_user(current_user: Annotated[UserItemCreate, Depends(get_current_user)]):
+    result = await db.execute(select(UserORM).where(UserORM.name == username))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise credentials_exception
+
+    return CurrentUser(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+        role=user.role,
+        disabled=user.disabled,
+        access_token=token,
+        token_type="bearer"
+    )
+
+async def get_current_active_user(current_user: Annotated[UserItemCreate, Depends(get_current_user)]) -> UserItemCreate:
+    """Verify that the current user is active."""
     if current_user.disabled:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise HTTPException(status_code=403, detail="Inactive user")
     return current_user
 
 class RoleChecker:
-  def __init__(self, allowed_roles: list[str]):
-    self.allowed_roles = allowed_roles
+    def __init__(self, allowed_roles: list[str]):
+        self.allowed_roles = allowed_roles
 
-  def __call__(self, user: Annotated[UserItemCreate, Depends(get_current_active_user)]):
-    if user.role not in self.allowed_roles:
-     raise HTTPException(status_code=403, detail="Operation not permitted")
+    async def __call__(self, current_user: Annotated[dict, Depends(get_current_user)]):
+        if current_user.get("role") not in self.allowed_roles:
+            raise HTTPException(
+                status_code=403,
+                detail="Operation not permitted for your role",
+                headers={"WWW-Authenticate": "Bearer"}
+            )

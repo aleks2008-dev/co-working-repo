@@ -1,6 +1,8 @@
 ---
 services:
   doctors-app:
+    env_file:
+      - /Users/user/Desktop/co-working-repo/.env
     container_name: doctors-app
     restart: always
     build:

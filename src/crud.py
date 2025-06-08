@@ -7,7 +7,21 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 
-async def create_doctor(db: AsyncSession, data: DoctorItemCreate):
+async def create_doctor(db: AsyncSession, data: DoctorItemCreate) -> DoctorORM:
+    """
+        Create a new doctor in the database.
+
+        Args:
+            db: Async database session
+            doctor_data: Validated doctor creation data
+
+        Returns:
+            The newly created doctor record
+
+        Raises:
+            HTTPException: If there's a database integrity error
+                - 409 Conflict for duplicate entries or invalid references
+        """
     hashed_password = await get_password_hash(data.password)
     doctor = DoctorORM(name=data.name, surname=data.surname, age=data.age, specialization=data.specialization,
                        category=data.category, password=hashed_password)
@@ -31,16 +45,54 @@ async def create_doctor(db: AsyncSession, data: DoctorItemCreate):
     return doctor
 
 async def get_doctors(db: AsyncSession, page: int, size: int) -> list[DoctorORM]:
+    """
+        Retrieve a paginated list of doctors from the database.
+
+        Args:
+            db (AsyncSession): The asynchronous database session.
+            page (int): The page number to retrieve (starting from 1).
+            size (int): The number of records per page.
+
+        Returns:
+            List[DoctorORM]: A list of DoctorORM objects corresponding to the requested page.
+
+        Example:
+            doctors = await get_doctors(db_session, page=2, size=10)
+        """
     result = await db.execute(select(DoctorORM).order_by(DoctorORM.name.asc()).offset((page - 1) * size).limit(size))
     doctors = result.scalars().all()
     return doctors
 
-async def get_doctor(db: AsyncSession, doctor_id: str):
+async def get_doctor(db: AsyncSession, doctor_id: str) -> DoctorORM:
+    """
+        Retrieve a doctor by their ID from the database.
+
+        Args:
+            db: Async database session
+            doctor_id: UUID of the doctor to retrieve
+
+        Returns:
+            DoctorORM instance if found, None otherwise
+        """
     result = await db.execute(select(DoctorORM).filter(DoctorORM.id == doctor_id))
     doctor = result.scalars().first()
     return doctor
 
-async def update_doctor_dump(db: AsyncSession, doctor_id: str, doctor_update: DoctorItemUpdate):
+async def update_doctor_dump(db: AsyncSession, doctor_id: str, doctor_update: DoctorItemUpdate) -> DoctorORM:
+    """
+        Update a doctor's information in the database.
+
+        Args:
+            db: Async database session
+            doctor_id: ID of the doctor to update
+            update_data: Validated update data (Pydantic model)
+
+        Returns:
+            Updated DoctorORM instance if found and updated, None if doctor not found
+
+        Raises:
+            HTTPException: If there's a database error during update
+        """
     db_doctor = await get_doctor(db, doctor_id)
     if not db_doctor:
         return None
@@ -54,7 +106,23 @@ async def update_doctor_dump(db: AsyncSession, doctor_id: str, doctor_update: Do
     await db.refresh(db_doctor)
     return db_doctor
 
-async def delete_doctor(db: AsyncSession, doctor_id: str):
+async def delete_doctor(db: AsyncSession, doctor_id: str)-> DoctorORM:
+    """
+        Delete a doctor record from the database by ID.
+
+        Args:
+            db: Async database session
+            doctor_id: UUID string identifying the doctor to delete
+
+        Returns:
+            The deleted DoctorORM instance if found and deleted,
+            None if no doctor with given ID exists
+
+        Raises:
+            HTTPException:
+                - 404 Not Found if doctor doesn't exist (optional)
+                - 500 Internal Server Error if database operation fails
+        """
     doctor = await get_doctor(db, doctor_id)
     if not doctor:
         return None

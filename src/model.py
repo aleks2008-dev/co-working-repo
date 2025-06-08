@@ -6,12 +6,14 @@ from datetime import date
 from typing import Optional
 
 class CategoryEnum(StrEnum):
+    """Medical doctor qualification categories"""
     FIRST = "first"
     SECOND = "second"
     HIGHEST = "highest"
     NO_CATEGORY = "no_category"
 
 class UserRole(StrEnum):
+    """User roles in the healthcare system"""
     user = "user"
     admin = "admin"
     doctor = "doctor"
@@ -38,6 +40,7 @@ class DoctorItem(DoctorItemCreate):
     id: UUID
 
 class DoctorItemUpdate(BaseModel):
+    """For updating doctor records with optional fields."""
     name: StrictStr | None = Field(default=None, min_length=3, max_length=10)
     surname: StrictStr | None = Field(default=None, min_length=3, max_length=10)
     age: StrictInt | None = Field(default=None, ge=0)
@@ -81,6 +84,9 @@ class UserItemCreate(BaseModel):
 class UserItem(UserItemCreate):
     id: UUID
 
+    class Config:
+        orm_mode = True
+
 class UserItemUpdate(BaseModel):
     name: StrictStr | None = Field(default=None, min_length=3, max_length=10)
     surname: StrictStr | None = Field(default=None, min_length=3, max_length=10)
@@ -118,7 +124,45 @@ class UserItemUpdate(BaseModel):
         return value
 
 class UserInDB(UserItemCreate):
+    id: int
+    role: UserRole
+    is_active: bool = True
     hashed_password: str
+
+    class Config:
+        from_attributes = True
+
+class UserPublic(UserInDB):
+    id: int
+    email: str
+    name: str
+    role: str
+    is_active: bool
+    class Config:
+        exclude = {"hashed_password"}
+
+    #hashed_password: str
+
+class CurrentUser(UserPublic):
+    access_token: Optional[str] = None
+    token_type: Optional[str] = "bearer"
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": 1,
+                "email": "user@example.com",
+                "name": "john_doe",
+                "role": "user",
+                "is_active": True,
+                "access_token": "eyJhbGciOi...",
+                "token_type": "bearer"
+            }
+        }
+
+class LoginInput(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
 
 class RoomItemCreate(BaseModel):
     number: StrictInt | None = Field(default=None, ge=0, le=100)
@@ -137,5 +181,5 @@ class Token(BaseModel):
     token_type: str | None = None
 
 class TokenData(BaseModel):
-    username: str | None = None
+    name: str | None = None
     role: StrictStr = Field(default="user")
