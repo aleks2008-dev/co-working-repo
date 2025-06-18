@@ -61,31 +61,16 @@ class UserItemCreate(BaseModel):
     password: Optional[str] = Field(default=None, exclude=True, min_length=8)
     disabled: bool = False
 
-    # @field_validator('phone')
-    # def validate_phone_number(cls, value):
-    #     pattern = r"""
-    #         ^(\+375|80)?          # Код страны/оператора
-    #         [\s\-\(\)]*          # Допустимые разделители
-    #         (\d{2})               # Первые 2 цифры
-    #         [\s\-\(\)]*           # Разделители
-    #         (\d{3})              # Следующие 3 цифры
-    #         [\s\-\(\)]*           # Разделители
-    #         (\d{2})              # Предпоследние 2 цифры
-    #         [\s\-\(\)]*           # Разделители
-    #         (\d{2})$             # Последние 2 цифры
-    #     """
-    #     if not re.fullmatch(pattern, value, flags=re.VERBOSE):
-    #         raise ValueError("Invalid phone number format")
-    #     cleaned_value = re.sub(r'\D', '', value)
-    #     if not (7 <= len(cleaned_value) <= 15):
-    #         raise ValueError('Phone number must be between 7 and 15 digits.')
-    #     return value
 
 class UserItem(UserItemCreate):
     id: UUID
 
     class Config:
-        orm_mode = True
+        from_attributes = True  # Вместо orm_mode
+        json_encoders = {
+            UUID: lambda v: str(v)  # Добавьте это для UUID
+        }
+        # orm_mode = True
 
 class UserItemUpdate(BaseModel):
     name: StrictStr | None = Field(default=None, min_length=3, max_length=10)
@@ -124,20 +109,20 @@ class UserItemUpdate(BaseModel):
         return value
 
 class UserInDB(UserItemCreate):
-    id: int
+    id: UUID
     role: UserRole
-    is_active: bool = True
-    hashed_password: str
+    is_active: bool | None = None
+    hashed_password: str | None = None
 
     class Config:
         from_attributes = True
 
 class UserPublic(UserInDB):
-    id: int
+    id: UUID
     email: str
     name: str
-    role: str
-    is_active: bool
+    role: UserRole
+    is_active: bool | None = None
     class Config:
         exclude = {"hashed_password"}
 

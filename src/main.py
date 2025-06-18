@@ -93,7 +93,8 @@ async def login(data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = 
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Неверный пароль")
 
     # Генерация токена
-    access_token =create_access_token(data={"sub": str(user.id), "role": user.role.value, "email": user.email})
+    # access_token =create_access_token(data={"sub": str(user.id), "role": user.role.value, "email": user.email})
+    access_token = create_access_token(subject=str(user.id), role= user.role, email= user.email)
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/users/", response_model=UserItem, tags=["user"])
