@@ -5,6 +5,7 @@ from sqlalchemy import select
 from fastapi import status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+
 @pytest.mark.asyncio
 async def test_delete_existing_user(client: AsyncClient, db_session: AsyncSession):
     test_user = UserORM(

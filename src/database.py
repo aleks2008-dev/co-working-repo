@@ -11,18 +11,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
-#DATABASE_URL = "postgresql+asyncpg://doctors:doctors@postgres-db/doctors"
 engine = create_async_engine(DATABASE_URL, echo=True)
 
 async_session = async_sessionmaker(engine)
+
 
 async def get_session() -> AsyncSession:
     """Asynchronous generator that yields database sessions."""
     async with async_session() as session:
         yield session
 
+
 class Base(AsyncAttrs, DeclarativeBase):
     pass
+
 
 class DoctorORM(Base):
     """Doctor database model representing medical professionals."""
@@ -38,6 +40,7 @@ class DoctorORM(Base):
 
     appointments: Mapped["AppointmentORM"] = relationship(back_populates="doctor", cascade="all, delete", passive_deletes=True, lazy="joined")
 
+
 class UserORM(Base):
     """User database model representing system users with authentication."""
     __tablename__ = "users"
@@ -47,11 +50,12 @@ class UserORM(Base):
     email: Mapped [str | None] = mapped_column(unique=True)
     age: Mapped[int]
     phone: Mapped[str] = mapped_column(unique=True)
-    role: Mapped[UserRole]
+    role: Mapped[UserRole] = mapped_column(nullable=False, server_default="user")
     password: Mapped[str]
     disabled: Mapped [bool] = mapped_column(Boolean, default=False)
 
     appointments: Mapped["AppointmentORM"] = relationship(back_populates="user", cascade="all, delete", passive_deletes=True, lazy="joined")
+
 
 class RoomORM(Base):
     """ ORM model representing a room in the database."""
@@ -61,12 +65,12 @@ class RoomORM(Base):
 
     appointments: Mapped["AppointmentORM"] = relationship(back_populates="room", cascade="all, delete", passive_deletes=True, lazy="joined")
 
+
 class AppointmentORM(Base):
     """ORM model representing an appointment in the database."""
     __tablename__ = "appointments"
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     date: Mapped[int]
-
     doctor_id = mapped_column(ForeignKey('doctors.id', ondelete="CASCADE"))
     doctor: Mapped["DoctorORM"] = relationship( back_populates="appointments", cascade="all, delete", passive_deletes=True, lazy="joined")
     user_id = mapped_column(ForeignKey('users.id', ondelete="CASCADE"))

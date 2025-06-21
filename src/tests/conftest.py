@@ -12,10 +12,14 @@ from datetime import timedelta, datetime, timezone
 from database import UserORM
 import jwt
 from model import UserRole
+import os
+from dotenv import load_dotenv
 
 logging.basicConfig(level=logging.DEBUG)
 
-TEST_DATABASE_URL = "postgresql+asyncpg://doctors:doctors@postgres-db-test:5432/doctors_test"
+load_dotenv()
+
+TEST_DATABASE_URL = os.getenv("DATABASE_URL")
 
 @pytest_asyncio.fixture(scope="session")
 async def engine():
@@ -44,21 +48,11 @@ async def db_session(engine):
         yield session
 
 
-# @pytest_asyncio.fixture(scope="function")
-# async def client(db_session: AsyncSession):
-#     app.dependency_overrides[get_session] = lambda: db_session
-#
-#     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as cl:
-#         yield cl
-
 @pytest_asyncio.fixture(scope="function")
 async def client(db_session: AsyncSession):
     app.dependency_overrides[get_session] = lambda: db_session
-
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        yield client
-
-
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as cl:
+        yield cl
 
 
 @pytest_asyncio.fixture
@@ -76,8 +70,9 @@ async def admin_user(db_session: AsyncSession):
         disabled=False
     )
     db_session.add(user)
-    await db_session.commit()
+    await db_session.flush()
     return user
+
 
 @pytest_asyncio.fixture
 async def regular_user(db_session: AsyncSession):
@@ -97,18 +92,9 @@ async def regular_user(db_session: AsyncSession):
     await db_session.commit()
     return user
 
-@pytest_asyncio.fixture
-def admin_token(admin_user):
-    """Генерирует валидный токен администратора"""
-    payload = {
-        "sub": str(admin_user.id),
-        "role": admin_user.role.value,
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=30)
-    }
-    return jwt.encode(payload, AuthConfig.SECRET_KEY, algorithm=AuthConfig.ALGORITHM)
 
 @pytest_asyncio.fixture
-def user_token(regular_user):
+async def user_token(regular_user):
     """Генерирует валидный токен пользователя"""
     payload = {
         "sub": str(regular_user.id),
@@ -116,6 +102,20 @@ def user_token(regular_user):
         "exp": datetime.now(timezone.utc) + timedelta(minutes=30)
     }
     return jwt.encode(payload, AuthConfig.SECRET_KEY, algorithm=AuthConfig.ALGORITHM)
+
+
+@pytest_asyncio.fixture
+async def admin_token(admin_user):
+    return jwt.encode(
+        {
+            "sub": str(admin_user.id),
+            "role": admin_user.role.value,
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=30)
+        },
+        AuthConfig.SECRET_KEY,
+        algorithm=AuthConfig.ALGORITHM
+    )
+
 
 @pytest_asyncio.fixture
 async def test_users(db_session: AsyncSession):

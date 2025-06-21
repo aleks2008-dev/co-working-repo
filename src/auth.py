@@ -1,20 +1,18 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Annotated
+from typing import Annotated
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 import jwt
 from jose import JWTError
-from jwt import PyJWTError
-from jwt.exceptions import InvalidTokenError
 from passlib.context import CryptContext
-from model import UserItemCreate, CurrentUser
+from model import CurrentUser
 from database import UserORM
 import os
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_session
-from sqlalchemy import select
-from typing import Any, Dict, Union
+from typing import Any, Union
+
 load_dotenv()
 
 class AuthConfig:
@@ -33,20 +31,11 @@ async def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against a hash."""
     return pwd_context.verify(plain_password, hashed_password)
 
+
 async def get_password_hash(password) -> str:
     """Generate a password hash."""
     return pwd_context.hash(password)
 
-# def create_access_token(
-#     data: dict,  # Добавляем параметр data
-#     expires_delta: timedelta = None,
-# ) -> str:
-#     """Create a JWT access token."""
-#     to_encode = data.copy()
-#     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=AuthConfig.ACCESS_TOKEN_EXPIRE_MINUTES))
-#     to_encode.update({"exp": expire})
-#     to_encode["exp"]= expire
-#     return jwt.encode(to_encode, AuthConfig.SECRET_KEY, algorithm=AuthConfig.ALGORITHM)
 
 def create_access_token(
         subject: Union[str, int],  # ID пользователя (обязательный)
@@ -85,35 +74,6 @@ def create_access_token(
         algorithm=AuthConfig.ALGORITHM
     )
 
-# async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_session)) -> CurrentUser:
-#     """Get the current authenticated user from the JWT token."""
-#     credentials_exception = HTTPException(
-#         status_code=status.HTTP_401_UNAUTHORIZED,
-#         detail="Could not validate credentials",
-#         headers={"WWW-Authenticate": "Bearer"},
-#     )
-#     try:
-#         payload = jwt.decode(token, AuthConfig.SECRET_KEY, algorithms=[AuthConfig.ALGORITHM])
-#         username: str = payload.get("sub")
-#         if username is None:
-#             raise credentials_exception
-#     except JWTError:
-#         raise credentials_exception
-#
-#     result = await db.execute(select(UserORM).where(UserORM.name == username))
-#     user = result.scalar_one_or_none()
-#     if not user:
-#         raise credentials_exception
-#
-#     return CurrentUser(
-#         id=user.id,
-#         email=user.email,
-#         name=user.name,
-#         role=user.role,
-#         disabled=user.disabled,
-#         access_token=token,
-#         token_type="bearer"
-#     )
 
 async def get_current_user(
         token: str = Depends(oauth2_scheme),
@@ -153,21 +113,23 @@ async def get_current_user(
             token_type="bearer"
         )
 
-    except (JWTError, AttributeError) as e:
+    except JWTError:
+        # Убрали неиспользуемую переменную e
         raise credentials_exception
+    except AttributeError:
+        # Добавили отдельную обработку для AttributeError
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user attributes",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
-async def get_current_active_user(current_user: Annotated[UserItemCreate, Depends(get_current_user)]) -> UserItemCreate:
-    """Verify that the current user is active."""
-    if current_user.disabled:
-        raise HTTPException(status_code=403, detail="Inactive user")
-    return current_user
 
 class RoleChecker:
     def __init__(self, allowed_roles: list[str]):
         self.allowed_roles = allowed_roles
 
     async def __call__(self, current_user: Annotated[dict, Depends(get_current_user)]):
-        # if current_user.get("role") not in self.allowed_roles:
         if current_user.role not in self.allowed_roles:
             raise HTTPException(
                 status_code=403,

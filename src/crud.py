@@ -1,11 +1,12 @@
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from database import DoctorORM, UserORM
-from model import DoctorItemUpdate, UserItemUpdate, DoctorItem, UserItem, DoctorItemCreate, UserItemCreate
+from model import DoctorItemUpdate, UserItemUpdate, DoctorItemCreate, UserItemCreate
 from auth import get_password_hash
-from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
+
 
 async def create_doctor(db: AsyncSession, data: DoctorItemCreate) -> DoctorORM:
     """
@@ -13,7 +14,7 @@ async def create_doctor(db: AsyncSession, data: DoctorItemCreate) -> DoctorORM:
 
         Args:
             db: Async database session
-            doctor_data: Validated doctor creation data
+            data: Validated doctor creation data
 
         Returns:
             The newly created doctor record
@@ -44,6 +45,7 @@ async def create_doctor(db: AsyncSession, data: DoctorItemCreate) -> DoctorORM:
         )
     return doctor
 
+
 async def get_doctors(db: AsyncSession, page: int, size: int) -> list[DoctorORM]:
     """
         Retrieve a paginated list of doctors from the database.
@@ -63,7 +65,8 @@ async def get_doctors(db: AsyncSession, page: int, size: int) -> list[DoctorORM]
     doctors = result.scalars().all()
     return doctors
 
-async def get_doctor(db: AsyncSession, doctor_id: str) -> DoctorORM:
+
+async def get_doctor(db: AsyncSession, doctor_id: UUID) -> DoctorORM:
     """
         Retrieve a doctor by their ID from the database.
 
@@ -78,14 +81,15 @@ async def get_doctor(db: AsyncSession, doctor_id: str) -> DoctorORM:
     doctor = result.scalars().first()
     return doctor
 
-async def update_doctor_dump(db: AsyncSession, doctor_id: str, doctor_update: DoctorItemUpdate) -> DoctorORM:
+
+async def update_doctor_dump(db: AsyncSession, doctor_id: UUID, doctor_update: DoctorItemUpdate) -> DoctorORM | None:
     """
         Update a doctor's information in the database.
 
         Args:
             db: Async database session
             doctor_id: ID of the doctor to update
-            update_data: Validated update data (Pydantic model)
+            doctor_update: Validated update data (Pydantic model)
 
         Returns:
             Updated DoctorORM instance if found and updated, None if doctor not found
@@ -106,7 +110,8 @@ async def update_doctor_dump(db: AsyncSession, doctor_id: str, doctor_update: Do
     await db.refresh(db_doctor)
     return db_doctor
 
-async def delete_doctor(db: AsyncSession, doctor_id: str)-> DoctorORM:
+
+async def delete_doctor(db: AsyncSession, doctor_id: UUID)-> DoctorORM | None:
     """
         Delete a doctor record from the database by ID.
 
@@ -130,10 +135,11 @@ async def delete_doctor(db: AsyncSession, doctor_id: str)-> DoctorORM:
     await db.commit()
     return doctor
 
+
 async def create_user(db: AsyncSession, data: UserItemCreate):
     hashed_password = await get_password_hash(data.password)
     user = UserORM(name=data.name, surname=data.surname, email=data.email, age=data.age,
-                       phone=data.phone, role=data.role, password=hashed_password)
+                       phone=data.phone, role=data.role, password=hashed_password, disabled=False)
     try:
         db.add(user)
         await db.commit()
@@ -153,17 +159,20 @@ async def create_user(db: AsyncSession, data: UserItemCreate):
         )
     return user
 
+
 async def get_users(db: AsyncSession, page: int, size: int) -> list[UserORM]:
     result = await db.execute(select(UserORM).order_by(UserORM.name.asc()).offset((page - 1) * size).limit(size))
     users = result.scalars().all()
     return users
 
-async def get_user(db: AsyncSession, user_id: str):
+
+async def get_user(db: AsyncSession, user_id: UUID):
     result = await db.execute(select(UserORM).filter(UserORM.id == user_id))
     user = result.scalars().first()
     return user
 
-async def update_user_dump(db: AsyncSession, user_id: str, user_update: UserItemUpdate):
+
+async def update_user_dump(db: AsyncSession, user_id: UUID, user_update: UserItemUpdate):
     db_user = await get_user(db, user_id)
     if not db_user:
         return None
@@ -177,7 +186,8 @@ async def update_user_dump(db: AsyncSession, user_id: str, user_update: UserItem
     await db.refresh(db_user)
     return db_user
 
-async def delete_user(db: AsyncSession, user_id: int):
+
+async def delete_user(db: AsyncSession, user_id: UUID):
     user = await get_user(db, user_id)
     if not user:
         return None

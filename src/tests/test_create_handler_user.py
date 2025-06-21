@@ -1,6 +1,7 @@
 import pytest
 from httpx import AsyncClient
 
+
 @pytest.mark.asyncio
 async def test_create_user(client: AsyncClient, setup_db):
     user_data = {
@@ -20,6 +21,7 @@ async def test_create_user(client: AsyncClient, setup_db):
     assert "id" in data
     assert data["name"] == user_data["name"]
 
+
 @pytest.mark.asyncio
 async def test_health_check(client):
      response = await client.get("/healthcheck/")
@@ -35,6 +37,7 @@ async def test_create_user_invalid_data(client):
 
     assert response.status_code == 422  # Expecting Unprocessable Entity
     assert "detail" in response.json()
+
 
 @pytest.mark.asyncio
 async def test_create_user_missing_required_field(client: AsyncClient):

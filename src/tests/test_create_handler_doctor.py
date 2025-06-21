@@ -19,12 +19,14 @@ async def test_create_doctor(client: AsyncClient, setup_db):
     assert "id" in data
     assert data["name"] == doctor_data["name"]
 
+
 @pytest.mark.asyncio
 async def test_create_doctor_invalid_data(client):
     invalid_doctor_data = {"name": "", "specialization": ""}
     response = await client.post("/doctors/", json=invalid_doctor_data)
 
     assert response.status_code == 422
+
 
 @pytest.mark.asyncio
 async def test_create_doctor_missing_required_field(client: AsyncClient):
@@ -42,6 +44,7 @@ async def test_create_doctor_missing_required_field(client: AsyncClient):
     response = await client.post("/doctors/", json=invalid_data)
     assert response.status_code == 422
     assert "detail" in response.json()
+
 
 @pytest.mark.asyncio
 async def test_create_doctor_invalid_age(client: AsyncClient):
@@ -61,6 +64,7 @@ async def test_create_doctor_invalid_age(client: AsyncClient):
     errors = response.json()["detail"]
     assert any("age" in error["loc"] for error in errors)
 
+
 @pytest.mark.asyncio
 async def test_create_doctor_short_password(client: AsyncClient):
     valid_doctor_data = {
@@ -76,6 +80,7 @@ async def test_create_doctor_short_password(client: AsyncClient):
 
     response = await client.post("/doctors/", json=invalid_data)
     assert response.status_code == 422
+
 
 @pytest.mark.asyncio
 async def test_create_doctor_duplicate(client):

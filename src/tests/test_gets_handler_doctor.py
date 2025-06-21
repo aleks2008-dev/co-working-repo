@@ -3,6 +3,7 @@ from httpx import AsyncClient
 from database import DoctorORM
 from sqlalchemy.ext.asyncio import AsyncSession
 
+
 @pytest.mark.asyncio
 async def test_get_doctors_default_pagination(client: AsyncClient, db_session: AsyncSession):
     for i in range(1, 10):
