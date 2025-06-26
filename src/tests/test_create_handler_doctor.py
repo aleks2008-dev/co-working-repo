@@ -1,15 +1,16 @@
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 @pytest.mark.asyncio
-async def test_create_doctor(client: AsyncClient, setup_db):
+async def test_create_doctor(client: AsyncClient, db_session: AsyncSession):
     doctor_data = {
         "name": "TestDoctor",
         "surname": "Test",
         "age": 34,
         "specialization": "travm",
         "category": "first",
-        "password": "string"
+        "password": "password"
     }
 
     response = await client.post("/doctors/", json=doctor_data)

@@ -27,12 +27,12 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-async def verify_password(plain_password: str, hashed_password: str) -> bool:
+def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against a hash."""
     return pwd_context.verify(plain_password, hashed_password)
 
 
-async def get_password_hash(password) -> str:
+def get_password_hash(password) -> str:
     """Generate a password hash."""
     return pwd_context.hash(password)
 
@@ -114,10 +114,9 @@ async def get_current_user(
         )
 
     except JWTError:
-        # Убрали неиспользуемую переменную e
         raise credentials_exception
     except AttributeError:
-        # Добавили отдельную обработку для AttributeError
+        # Отдельная обработка для AttributeError
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid user attributes",

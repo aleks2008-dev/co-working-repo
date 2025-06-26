@@ -6,7 +6,7 @@ from database import Base
 from httpx import AsyncClient
 import logging
 from httpx import ASGITransport
-from auth import create_access_token, AuthConfig
+from auth import AuthConfig
 from uuid import uuid4
 from datetime import timedelta, datetime, timezone
 from database import UserORM
@@ -72,36 +72,6 @@ async def admin_user(db_session: AsyncSession):
     db_session.add(user)
     await db_session.flush()
     return user
-
-
-@pytest_asyncio.fixture
-async def regular_user(db_session: AsyncSession):
-    """Создает обычного пользователя в тестовой БД"""
-    user = UserORM(
-        id=uuid4(),
-        email="admin@test.com",
-        name="admin",
-        surname="admin",
-        age=39,
-        phone="292342323",
-        role=UserRole.user,
-        password="hashed_user_pass",
-        disabled=False
-    )
-    db_session.add(user)
-    await db_session.commit()
-    return user
-
-
-@pytest_asyncio.fixture
-async def user_token(regular_user):
-    """Генерирует валидный токен пользователя"""
-    payload = {
-        "sub": str(regular_user.id),
-        "role": regular_user.role.value,
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=30)
-    }
-    return jwt.encode(payload, AuthConfig.SECRET_KEY, algorithm=AuthConfig.ALGORITHM)
 
 
 @pytest_asyncio.fixture

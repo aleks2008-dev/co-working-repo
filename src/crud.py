@@ -23,7 +23,7 @@ async def create_doctor(db: AsyncSession, data: DoctorItemCreate) -> DoctorORM:
             HTTPException: If there's a database integrity error
                 - 409 Conflict for duplicate entries or invalid references
         """
-    hashed_password = await get_password_hash(data.password)
+    hashed_password = get_password_hash(data.password)
     doctor = DoctorORM(name=data.name, surname=data.surname, age=data.age, specialization=data.specialization,
                        category=data.category, password=hashed_password)
     try:
@@ -137,7 +137,7 @@ async def delete_doctor(db: AsyncSession, doctor_id: UUID)-> DoctorORM | None:
 
 
 async def create_user(db: AsyncSession, data: UserItemCreate):
-    hashed_password = await get_password_hash(data.password)
+    hashed_password = get_password_hash(data.password)
     user = UserORM(name=data.name, surname=data.surname, email=data.email, age=data.age,
                        phone=data.phone, role=data.role, password=hashed_password, disabled=False)
     try:

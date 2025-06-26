@@ -148,13 +148,3 @@ class AppointmentItemCreate(BaseModel):
 
 class AppointmentItem(AppointmentItemCreate):
     id: UUID
-
-
-class Token(BaseModel):
-    access_token: str | None = None
-    token_type: str | None = None
-
-
-class TokenData(BaseModel):
-    name: str | None = None
-    role: StrictStr = Field(default="user")

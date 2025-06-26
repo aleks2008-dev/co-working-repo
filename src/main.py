@@ -53,7 +53,7 @@ async def read_doctor(doctor_id: UUID, db: Annotated[AsyncSession, Depends(get_s
 
 
 @app.patch("/doctors/{doctor_id}", response_model=DoctorItemCreate, tags=["doctor"])
-async def doctor_update(doctor_id: str, doctor: DoctorItemUpdate, db: Annotated[AsyncSession, Depends(get_session)]) -> DoctorORM:
+async def doctor_update(doctor_id: UUID, doctor: DoctorItemUpdate, db: Annotated[AsyncSession, Depends(get_session)]) -> DoctorORM:
     """Retrieve details of a specific doctor by their ID."""
     db_doctor = await crud.update_doctor_dump(db, doctor_id, doctor)
     if not db_doctor:
@@ -79,7 +79,7 @@ async def login(data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = 
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверное имя пользователя")
     if not verify_password(data.password, user.password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Неверный пароль")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверный пароль")
 
     access_token = create_access_token(subject=str(user.id), role= user.role, email= user.email)
     return {"access_token": access_token, "token_type": "bearer"}
