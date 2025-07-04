@@ -1,8 +1,8 @@
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from database import DoctorORM, UserORM
-from model import DoctorItemUpdate, UserItemUpdate, DoctorItemCreate, UserItemCreate
+from database import DoctorORM, UserORM, RoomORM
+from model import DoctorItemUpdate, UserItemUpdate, DoctorItemCreate, UserItemCreate, RoomItemCreate
 from auth import get_password_hash
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
@@ -194,3 +194,25 @@ async def delete_user(db: AsyncSession, user_id: UUID):
     await db.delete(user)
     await db.commit()
     return user
+
+
+async def create_room(db: AsyncSession, data: RoomItemCreate):
+    room = RoomORM(number=data.number)
+    try:
+        db.add(room)
+        await db.commit()
+        await db.refresh(room)
+    except IntegrityError as e:
+        await db.rollback()
+
+        error_msg = "Database integrity error"
+        if "unique constraint" in str(e).lower():
+            error_msg = "Duplicate entry. User with these details already exists"
+        elif "foreign key constraint" in str(e).lower():
+            error_msg = "Invalid reference in foreign key"
+
+        raise HTTPException(
+            status_code=409,
+            detail=error_msg
+        )
+    return room

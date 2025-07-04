@@ -7,6 +7,7 @@ from model import CategoryEnum, UserRole
 import os
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import date
 
 load_dotenv()
 

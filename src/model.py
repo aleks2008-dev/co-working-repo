@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, EmailStr, field_validator, computed_field
 from datetime import date
 from typing import Optional
 
+
 class CategoryEnum(StrEnum):
     """Medical doctor qualification categories"""
     FIRST = "first"
@@ -144,6 +145,9 @@ class RoomItem(RoomItemCreate):
 
 class AppointmentItemCreate(BaseModel):
     date: date
+    doctor_id: UUID
+    user_id: UUID
+    room_id: UUID
 
 
 class AppointmentItem(AppointmentItemCreate):

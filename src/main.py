@@ -5,10 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
 import crud
-from database import UserORM, get_session, DoctorORM
-from model import DoctorItem, UserItem, DoctorItemCreate, UserItemUpdate, DoctorItemUpdate, UserItemCreate, UserRole
-from auth import verify_password, create_access_token
-from crud import get_doctors, get_doctor, get_user, get_users, delete_doctor, delete_user, create_doctor, create_user
+from database import UserORM, get_session, DoctorORM, AppointmentORM
+from model import DoctorItem, UserItem, DoctorItemCreate, UserItemUpdate, DoctorItemUpdate, UserItemCreate, UserRole, AppointmentItemCreate, RoomItemCreate
+from auth import verify_password, create_access_token, get_current_user
+from crud import get_doctors, get_doctor, get_user, get_users, delete_doctor, delete_user, create_doctor, create_user, create_room
 from auth import RoleChecker
 
 # @asynccontextmanager
@@ -90,7 +90,7 @@ async def user_create(data: UserItemCreate, db: Annotated[AsyncSession, Depends(
     return await create_user(db, data)
 
 
-@app.get("/users/", response_model=list[UserItem], dependencies=[Depends(RoleChecker([UserRole.user]))], tags=["user"])
+@app.get("/users/", response_model=list[UserItem], dependencies=[Depends(RoleChecker([UserRole.admin]))], tags=["user"])
 async def read_users(db: Annotated[AsyncSession, Depends(get_session)], page: int = Query(ge=0, default=1), size: int = Query(ge=1, le=100, default=10)) -> list:
     return await get_users(db, page, size)
 
@@ -117,3 +117,35 @@ async def user_delete(user_id: UUID, db: Annotated[AsyncSession, Depends(get_ses
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return {"message": "User deleted"}
+
+
+@app.post("/appointments", tags=["appointments"])
+async def create_appointment(appointment_data: AppointmentItemCreate, db: AsyncSession = Depends(get_session), current_user: UserORM = Depends(get_current_user)):
+    # Проверка существования врача
+    doctor = await get_doctor(db, appointment_data.doctor_id)
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+
+    # Проверка существования пользователя
+    user = await get_user(db, appointment_data.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Создание записи
+    new_appointment = AppointmentORM(
+        doctor_id=appointment_data.doctor_id,
+        user_id=appointment_data.user_id,
+        date=int(appointment_data.date.strftime('%Y%m%d')),
+        room_id=appointment_data.room_id
+    )
+
+    db.add(new_appointment)
+    await db.commit()
+    await db.refresh(new_appointment)
+
+    return new_appointment
+
+
+@app.post("/rooms/", response_model=RoomItemCreate, tags=["room"])
+async def room_create(data: RoomItemCreate, db: Annotated[AsyncSession, Depends(get_session)]):
+    return await create_room(db, data)
