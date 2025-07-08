@@ -1,71 +1,151 @@
-from contextlib import asynccontextmanager
-from typing import Annotated, List
-from uuid import uuid4
-
-from model import CategoryEnum
-from fastapi import FastAPI, Depends, Query
+from typing import Annotated
+from fastapi import FastAPI, Depends, HTTPException, Query, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, text
-from database import engine, Base, DoctorORM, async_session
-from model import DoctorItem, DoctorItemCreate
+from sqlalchemy import select
+from uuid import UUID
+import crud
+from database import UserORM, get_session, DoctorORM, AppointmentORM
+from model import DoctorItem, UserItem, DoctorItemCreate, UserItemUpdate, DoctorItemUpdate, UserItemCreate, UserRole, AppointmentItemCreate, RoomItemCreate
+from auth import verify_password, create_access_token, get_current_user
+from crud import get_doctors, get_doctor, get_user, get_users, delete_doctor, delete_user, create_doctor, create_user, create_room
+from auth import RoleChecker
 
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     print("Starting up...")
+#     async with engine.begin() as conn:
+#         await conn.run_sync(Base.metadata.create_all)
+#     yield
+#     print("Shutting down...")
+#     async with engine.begin() as conn:
+#         await conn.run_sync(Base.metadata.drop_all)
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    print("Starting up...")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    print("Shutting down...")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+app = FastAPI()#lifespan=lifespan)
 
-app = FastAPI(lifespan=lifespan)
-
-@app.get("/healthcheck")
+@app.get("/healthcheck/")
 async def healthcheck():
     return {"status": "ok"}
 
+# async def get_session() -> AsyncSession:
+#     """Asynchronous generator that yields database sessions."""
+#     async with async_session() as session:
+#         yield session
 
-async def get_session():
-    async with async_session() as session:
-        yield session
+@app.post("/doctors/", response_model=DoctorItem, tags=["doctor"])
+async def doctor_create(data: DoctorItemCreate, db: Annotated[AsyncSession, Depends(get_session)]) -> DoctorORM:
+    """Register a new medical professional in the system."""
+    return await create_doctor(db, data)
 
-@app.post("/doctors") # , response_model=DoctorItem
-async def create_doctors(data: DoctorItemCreate, db: Annotated[AsyncSession, Depends(get_session)]):
-    doctor = DoctorORM(name=data.name, age=data.age, category=data.category)
-    db.add(doctor)
+
+@app.get("/doctors/", response_model=list[DoctorItem], tags=["doctor"])
+async def read_doctors(db: Annotated[AsyncSession, Depends(get_session)], page: int = Query(ge=0, default=1), size: int = Query(ge=1, le=100, default=10)) -> list[DoctorORM]:
+    """Retrieve a paginated list of doctors."""
+    return await get_doctors(db, page, size)
+
+
+@app.get("/doctors/{doctor_id}", response_model=DoctorItem, tags=["doctor"])
+async def read_doctor(doctor_id: UUID, db: Annotated[AsyncSession, Depends(get_session)]):
+    doctor = await get_doctor(db, doctor_id)
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+    return doctor
+
+
+@app.patch("/doctors/{doctor_id}", response_model=DoctorItemCreate, tags=["doctor"])
+async def doctor_update(doctor_id: UUID, doctor: DoctorItemUpdate, db: Annotated[AsyncSession, Depends(get_session)]) -> DoctorORM:
+    """Retrieve details of a specific doctor by their ID."""
+    db_doctor = await crud.update_doctor_dump(db, doctor_id, doctor)
+    if not db_doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+    return db_doctor
+
+
+@app.delete("/doctors/{doctor_id}", tags=["doctor"])
+async def doctor_delete(doctor_id: UUID, db: Annotated[AsyncSession, Depends(get_session)]):
+    """Delete a doctor by their ID."""
+    doctor = await delete_doctor(db, doctor_id)
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+    return {"message": "Doctor deleted"}
+
+
+# Вход в систему User
+@app.post("/token")
+async def login(data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_session)):
+    result = await db.execute(select(UserORM).where(UserORM.name == data.username))
+    user = result.scalars().first()
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверное имя пользователя")
+    if not verify_password(data.password, user.password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверный пароль")
+
+    access_token = create_access_token(subject=str(user.id), role= user.role, email= user.email)
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.post("/users/", response_model=UserItem, tags=["user"])
+async def user_create(data: UserItemCreate, db: Annotated[AsyncSession, Depends(get_session)]):
+    return await create_user(db, data)
+
+
+@app.get("/users/", response_model=list[UserItem], dependencies=[Depends(RoleChecker([UserRole.admin]))], tags=["user"])
+async def read_users(db: Annotated[AsyncSession, Depends(get_session)], page: int = Query(ge=0, default=1), size: int = Query(ge=1, le=100, default=10)) -> list:
+    return await get_users(db, page, size)
+
+
+@app.get("/users/{user_id}", response_model=UserItem, tags=["user"])
+async def read_user(user_id: UUID, db: Annotated[AsyncSession, Depends(get_session)]):
+    user = await get_user(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
+@app.patch("/users/{user_id}", response_model=UserItemCreate, tags=["user"])
+async def user_update(user_id: UUID, user: UserItemUpdate, db: Annotated[AsyncSession, Depends(get_session)]):
+    db_user = await crud.update_user_dump(db, user_id, user)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return db_user
+
+
+@app.delete("/users/{user_id}", tags=["user"])
+async def user_delete(user_id: UUID, db: Annotated[AsyncSession, Depends(get_session)]):
+    user = await delete_user(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"message": "User deleted"}
+
+
+@app.post("/appointments", tags=["appointments"])
+async def create_appointment(appointment_data: AppointmentItemCreate, db: AsyncSession = Depends(get_session), current_user: UserORM = Depends(get_current_user)):
+    # Проверка существования врача
+    doctor = await get_doctor(db, appointment_data.doctor_id)
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+
+    # Проверка существования пользователя
+    user = await get_user(db, appointment_data.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Создание записи
+    new_appointment = AppointmentORM(
+        doctor_id=appointment_data.doctor_id,
+        user_id=appointment_data.user_id,
+        date=int(appointment_data.date.strftime('%Y%m%d')),
+        room_id=appointment_data.room_id
+    )
+
+    db.add(new_appointment)
     await db.commit()
+    await db.refresh(new_appointment)
+
+    return new_appointment
 
 
-@app.get("/doctors/{doctor_id}", response_model=DoctorItem)
-async def get_doctor_id(doctor_id: int):
-    print(doctor_id)
-    return {"id": uuid4(), "name": "aleks", "age": 23, "category": CategoryEnum.FIRST}
-
-
-@app.get("/doctors/", response_model=list[DoctorItem])
-async def read_doctors(db: async_session = Depends(get_session)):
-    textual_sql = text("SELECT * FROM doctors")
-    orm_sql = select(DoctorORM).from_statement(textual_sql)
-    for user_obj in db.execute(orm_sql).scalars():
-        print(user_obj)
-
-
-# @app.get("/doctors/", response_model=list[DoctorItem])
-# async def read_doctors(skip: int = 0, limit: int = 10, db: async_session = Depends(get_session)):
-#     return db.execute(select(DoctorORM).offset(skip).limit(limit)).all()
-
-# @app.get("/", response_model=List[DoctorItem])
-# def select_doctors():
-#     with async_session() as session:
-#         doctors = session.exec(select(DoctorORM)).all()
-#         session.commit()
-#         print(doctors.data)
-
-
-# @app.get("/", response_model=List[DoctorItem])
-# async def read_all_doctors(db: Annotated[AsyncSession, Depends(get_session)]):
-#     query = DoctorORM.select()
-#     return await db.fetch_all(query=query)
-
+@app.post("/rooms/", response_model=RoomItemCreate, tags=["room"])
+async def room_create(data: RoomItemCreate, db: Annotated[AsyncSession, Depends(get_session)]):
+    return await create_room(db, data)
