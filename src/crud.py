@@ -1,11 +1,19 @@
 from uuid import UUID
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from database import DoctorORM, UserORM, RoomORM
-from model import DoctorItemUpdate, UserItemUpdate, DoctorItemCreate, UserItemCreate, RoomItemCreate
-from auth import get_password_hash
+
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+
+from auth import get_password_hash
+from database import AppointmentORM, DoctorORM, RoomORM, UserORM
+from model import (
+    DoctorItemCreate,
+    DoctorItemUpdate,
+    RoomItemCreate,
+    UserItemCreate,
+    UserItemUpdate,
+)
 
 
 async def create_doctor(db: AsyncSession, data: DoctorItemCreate) -> DoctorORM:
@@ -42,7 +50,7 @@ async def create_doctor(db: AsyncSession, data: DoctorItemCreate) -> DoctorORM:
         raise HTTPException(
             status_code=409,
             detail=error_msg
-        )
+        ) from None
     return doctor
 
 
@@ -156,7 +164,7 @@ async def create_user(db: AsyncSession, data: UserItemCreate):
         raise HTTPException(
             status_code=409,
             detail=error_msg
-        )
+        ) from None
     return user
 
 
@@ -214,5 +222,25 @@ async def create_room(db: AsyncSession, data: RoomItemCreate):
         raise HTTPException(
             status_code=409,
             detail=error_msg
-        )
+        ) from None
     return room
+
+
+async def get_appointments(db: AsyncSession, page: int, size: int) -> list[AppointmentORM]:
+    """
+        Retrieve a paginated list of doctors from the database.
+
+        Args:
+            db (AsyncSession): The asynchronous database session.
+            page (int): The page number to retrieve (starting from 1).
+            size (int): The number of records per page.
+
+        Returns:
+            List[AppointmentORM]: A list of AppointmentORM objects corresponding to the requested page.
+
+        Example:
+            appointments = await get_appointments(db_session, page=2, size=10)
+        """
+    result = await db.execute(select(AppointmentORM).order_by(AppointmentORM.date.asc()).offset((page - 1) * size).limit(size))
+    appointments = result.scalars().all()
+    return appointments

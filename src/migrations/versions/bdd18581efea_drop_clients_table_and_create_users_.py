@@ -6,11 +6,11 @@ Create Date: 2025-04-11 07:39:36.538080
 
 """
 import uuid
-from typing import Sequence, Union
+from collections.abc import Sequence
+from typing import Union
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'bdd18581efea'

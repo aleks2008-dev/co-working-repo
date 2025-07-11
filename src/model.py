@@ -1,9 +1,19 @@
 import re
-from enum import StrEnum
-from uuid import UUID
-from pydantic import BaseModel, Field, EmailStr, field_validator, computed_field, StrictStr, StrictInt, ConfigDict
 from datetime import date
+from enum import StrEnum
 from typing import Optional
+from uuid import UUID
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    StrictInt,
+    StrictStr,
+    computed_field,
+    field_validator,
+)
 
 
 class CategoryEnum(StrEnum):
@@ -146,8 +156,18 @@ class RoomItem(RoomItemCreate):
 class AppointmentItemCreate(BaseModel):
     date: date
     doctor_id: UUID
-    user_id: UUID
     room_id: UUID
+
+    @field_validator('date', mode='before')
+    def parse_date(cls, value):
+        if isinstance(value, int):
+            # Преобразуем из формата YYYYMMDD в date
+            return date(
+                year=value // 10000,
+                month=(value % 10000) // 100,
+                day=value % 100
+            )
+        return value
 
 
 class AppointmentItem(AppointmentItemCreate):

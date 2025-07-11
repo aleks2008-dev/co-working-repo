@@ -1,8 +1,10 @@
-import uuid
-import pytest
+import uuid  # Стандартная библиотека
+
+import pytest  # Сторонние библиотеки (import)
+from httpx import AsyncClient  # Сторонние (from..import)
 from sqlalchemy.ext.asyncio import AsyncSession
-from httpx import AsyncClient
-from database import UserORM
+
+from database import UserORM  # Локальные модули
 
 
 @pytest.mark.asyncio

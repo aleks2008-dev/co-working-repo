@@ -1,13 +1,18 @@
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlalchemy.ext.asyncio import AsyncAttrs
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-import uuid
-from sqlalchemy import UUID, ForeignKey, Boolean
-from model import CategoryEnum, UserRole
 import os
-from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import AsyncSession
+import uuid
 from datetime import date
+
+from dotenv import load_dotenv
+from sqlalchemy import UUID, Boolean, Date, ForeignKey
+from sqlalchemy.ext.asyncio import (
+    AsyncAttrs,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+from model import CategoryEnum, UserRole
 
 load_dotenv()
 
@@ -71,7 +76,7 @@ class AppointmentORM(Base):
     """ORM model representing an appointment in the database."""
     __tablename__ = "appointments"
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    date: Mapped[int]
+    date: Mapped[date] = mapped_column(Date)
     doctor_id = mapped_column(ForeignKey('doctors.id', ondelete="CASCADE"))
     doctor: Mapped["DoctorORM"] = relationship( back_populates="appointments", cascade="all, delete", passive_deletes=True, lazy="joined")
     user_id = mapped_column(ForeignKey('users.id', ondelete="CASCADE"))

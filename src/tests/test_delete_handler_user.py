@@ -1,9 +1,10 @@
-from database import UserORM
 import pytest
+from fastapi import status
 from httpx import AsyncClient
 from sqlalchemy import select
-from fastapi import status
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from database import UserORM
 
 
 @pytest.mark.asyncio

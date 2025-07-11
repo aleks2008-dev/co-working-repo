@@ -1,15 +1,38 @@
 from typing import Annotated
-from fastapi import FastAPI, Depends, HTTPException, Query, status
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from uuid import UUID
+
+from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 import crud
-from database import UserORM, get_session, DoctorORM, AppointmentORM
-from model import DoctorItem, UserItem, DoctorItemCreate, UserItemUpdate, DoctorItemUpdate, UserItemCreate, UserRole, AppointmentItemCreate, RoomItemCreate
-from auth import verify_password, create_access_token, get_current_user
-from crud import get_doctors, get_doctor, get_user, get_users, delete_doctor, delete_user, create_doctor, create_user, create_room
-from auth import RoleChecker
+from auth import RoleChecker, create_access_token, get_current_user, verify_password
+from crud import (
+    create_doctor,
+    create_room,
+    create_user,
+    delete_doctor,
+    delete_user,
+    get_appointments,
+    get_doctor,
+    get_doctors,
+    get_user,
+    get_users,
+)
+from database import AppointmentORM, DoctorORM, UserORM, get_session
+from model import (
+    AppointmentItem,
+    AppointmentItemCreate,
+    DoctorItem,
+    DoctorItemCreate,
+    DoctorItemUpdate,
+    RoomItemCreate,
+    UserItem,
+    UserItemCreate,
+    UserItemUpdate,
+    UserRole,
+)
 
 # @asynccontextmanager
 # async def lifespan(app: FastAPI):
@@ -126,15 +149,10 @@ async def create_appointment(appointment_data: AppointmentItemCreate, db: AsyncS
     if not doctor:
         raise HTTPException(status_code=404, detail="Doctor not found")
 
-    # Проверка существования пользователя
-    user = await get_user(db, appointment_data.user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
     # Создание записи
     new_appointment = AppointmentORM(
         doctor_id=appointment_data.doctor_id,
-        user_id=appointment_data.user_id,
+        user_id=current_user.id,
         date=int(appointment_data.date.strftime('%Y%m%d')),
         room_id=appointment_data.room_id
     )
@@ -149,3 +167,9 @@ async def create_appointment(appointment_data: AppointmentItemCreate, db: AsyncS
 @app.post("/rooms/", response_model=RoomItemCreate, tags=["room"])
 async def room_create(data: RoomItemCreate, db: Annotated[AsyncSession, Depends(get_session)]):
     return await create_room(db, data)
+
+
+@app.get("/appointments/", response_model=list[AppointmentItem], tags=["appointments"])
+async def read_appointments(db: Annotated[AsyncSession, Depends(get_session)], page: int = Query(ge=0, default=1), size: int = Query(ge=1, le=100, default=10)) -> list[AppointmentORM]:
+    """Retrieve a paginated list of doctors."""
+    return await get_appointments(db, page, size)

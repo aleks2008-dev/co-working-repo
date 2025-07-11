@@ -1,17 +1,17 @@
+import os
 from datetime import datetime, timedelta, timezone
-from typing import Annotated
+from typing import Annotated, Any, Union
+
+import jwt
+from dotenv import load_dotenv
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-import jwt
 from jose import JWTError
 from passlib.context import CryptContext
-from model import CurrentUser
-from database import UserORM
-import os
-from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession
-from database import get_session
-from typing import Any, Union
+
+from database import UserORM, get_session
+from model import CurrentUser
 
 load_dotenv()
 
@@ -121,7 +121,7 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid user attributes",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from None
 
 
 class RoleChecker:
