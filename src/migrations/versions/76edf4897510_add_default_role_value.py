@@ -5,11 +5,10 @@ Revises: bdd18581efea
 Create Date: 2025-06-19 16:34:22.346537
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
+from typing import Union
 
 from alembic import op
-import sqlalchemy as sa
-
 
 # revision identifiers, used by Alembic.
 revision: str = '76edf4897510'
@@ -24,8 +23,8 @@ def upgrade():
 
     # 2. Конвертируем существующие данные
     op.execute("""
-    ALTER TABLE users 
-    ALTER COLUMN role TYPE userrole_temp 
+    ALTER TABLE users
+    ALTER COLUMN role TYPE userrole_temp
     USING role::text::userrole_temp
     """)
 

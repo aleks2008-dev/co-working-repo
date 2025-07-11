@@ -1,7 +1,8 @@
 import pytest
 from httpx import AsyncClient
-from database import DoctorORM
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from database import DoctorORM
 
 
 @pytest.mark.asyncio
@@ -95,7 +96,7 @@ async def test_pagination_metadata(client: AsyncClient, db_session: AsyncSession
         ("?page=10&size=3", 0, 10, 9),  # Страница за пределами
     ]
 
-    for params, expected_items, req_page, total_pages in test_cases:
+    for params, expected_items, _req_page, _total_pages in test_cases:
         response = await client.get(f"/doctors/{params}")
         data = response.json()
 
@@ -108,7 +109,7 @@ async def test_pagination_metadata(client: AsyncClient, db_session: AsyncSession
 @pytest.mark.asyncio
 async def test_response_structure(client: AsyncClient, db_session: AsyncSession):
     doctor = DoctorORM(
-        name=f"Doctor",
+        name="Doctor",
         surname="Test",
         age=30,
         specialization="General",
