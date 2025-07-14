@@ -1,5 +1,7 @@
 from typing import Annotated
 from uuid import UUID
+from datetime import datetime, timedelta
+from jose import JWTError
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -7,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import crud
-from auth import RoleChecker, create_access_token, get_current_user, verify_password
+from auth import RoleChecker, create_access_token, get_current_user, verify_password, generate_reset_token, verify_reset_token, send_reset_email, get_password_hash
 from crud import (
     create_doctor,
     create_room,
@@ -19,6 +21,7 @@ from crud import (
     get_doctors,
     get_user,
     get_users,
+    get_user_by_email
 )
 from database import AppointmentORM, DoctorORM, UserORM, get_session
 from model import (
@@ -32,6 +35,8 @@ from model import (
     UserItemCreate,
     UserItemUpdate,
     UserRole,
+    PasswordResetRequest,
+    PasswordResetConfirm
 )
 
 # @asynccontextmanager
@@ -173,3 +178,51 @@ async def room_create(data: RoomItemCreate, db: Annotated[AsyncSession, Depends(
 async def read_appointments(db: Annotated[AsyncSession, Depends(get_session)], page: int = Query(ge=0, default=1), size: int = Query(ge=1, le=100, default=10)) -> list[AppointmentORM]:
     """Retrieve a paginated list of doctors."""
     return await get_appointments(db, page, size)
+
+
+@app.post("/password-reset")
+async def request_password_reset(
+        request: PasswordResetRequest,
+        db: AsyncSession = Depends(get_session)
+):
+    user = await get_user_by_email(db, request.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="Email not found")
+
+    # Генерация токена (действителен 1 час)
+    reset_token = generate_reset_token(user.email)
+    user.reset_token = reset_token
+    user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+    await db.commit()
+
+    # Отправка email (используем FastAPI-Mail)
+    await send_reset_email(user.email, reset_token)
+    return {"message": "Reset link sent"}
+
+
+# 2. Подтверждение сброса пароля
+@app.post("/password-reset-confirm")
+async def confirm_password_reset(
+        form_data: PasswordResetConfirm,
+        db: AsyncSession = Depends(get_session)
+):
+    # Проверка токена
+    try:
+        email = verify_reset_token(form_data.token)
+    except JWTError:
+        raise HTTPException(status_code=400, detail="Invalid token")
+
+    user = await get_user_by_email(db, email)
+    if not user or user.reset_token != form_data.token:
+        raise HTTPException(status_code=400, detail="Invalid token")
+
+    if datetime.utcnow() > user.reset_token_expires:
+        raise HTTPException(status_code=400, detail="Token expired")
+
+    # Обновление пароля
+    user.hashed_password = get_password_hash(form_data.new_password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    await db.commit()
+
+    return {"message": "Password updated successfully"}

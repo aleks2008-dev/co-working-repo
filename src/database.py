@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.ext.hybrid import hybrid_property
 
 from model import CategoryEnum, UserRole
 
@@ -59,6 +60,9 @@ class UserORM(Base):
     role: Mapped[UserRole] = mapped_column(nullable=False, server_default="user")
     password: Mapped[str]
     disabled: Mapped [bool] = mapped_column(Boolean, default=False)
+
+    reset_token: Mapped [str | None] = mapped_column(nullable=True)
+    reset_token_expires: Mapped[date] = mapped_column(Date)
 
     appointments: Mapped["AppointmentORM"] = relationship(back_populates="user", cascade="all, delete", passive_deletes=True, lazy="joined")
 

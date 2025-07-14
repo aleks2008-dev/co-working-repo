@@ -172,3 +172,12 @@ class AppointmentItemCreate(BaseModel):
 
 class AppointmentItem(AppointmentItemCreate):
     id: UUID
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str

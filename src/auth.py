@@ -1,6 +1,8 @@
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any, Union
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+from config import Settings
 
 import jwt
 from dotenv import load_dotenv
@@ -135,3 +137,30 @@ class RoleChecker:
                 detail="Operation not permitted for your role",
                 headers={"WWW-Authenticate": "Bearer"}
             )
+
+
+def generate_reset_token(email: str) -> str:
+    expires = datetime.utcnow() + timedelta(hours=1)
+    return jwt.encode(
+        {"sub": email, "exp": expires},
+        AuthConfig.SECRET_KEY,
+        algorithm="HS256"
+    )
+
+
+def verify_reset_token(token: str) -> str:
+    try:
+        payload = jwt.decode(token, AuthConfig.SECRET_KEY, algorithms=["HS256"])
+        return payload["sub"]
+    except JWTError:
+        raise HTTPException(status_code=400, detail="Invalid token")
+
+
+async def send_reset_email(email: str, token: str):
+    reset_link = f"https://yourapp.com/reset-password?token={token}"
+    message = MessageSchema(
+        subject="Password Reset",
+        recipients=[email],
+        body=f"Click to reset: {reset_link}",
+    )
+    await FastMail(Settings.email_conf).send_message(message)

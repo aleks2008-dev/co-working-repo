@@ -7,6 +7,7 @@ from sqlalchemy.future import select
 
 from auth import get_password_hash
 from database import AppointmentORM, DoctorORM, RoomORM, UserORM
+# from main import request_password_reset
 from model import (
     DoctorItemCreate,
     DoctorItemUpdate,
@@ -176,6 +177,12 @@ async def get_users(db: AsyncSession, page: int, size: int) -> list[UserORM]:
 
 async def get_user(db: AsyncSession, user_id: UUID):
     result = await db.execute(select(UserORM).filter(UserORM.id == user_id))
+    user = result.scalars().first()
+    return user
+
+
+async def get_user_by_email(db: AsyncSession, user_email: str):
+    result = await db.execute(select(UserORM).filter(UserORM.email == user_email))
     user = result.scalars().first()
     return user
 
