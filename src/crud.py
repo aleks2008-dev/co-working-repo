@@ -1,44 +1,142 @@
+from uuid import UUID
+
+from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from database import DoctorORM, ClientORM
-from model import DoctorItemUpdate, ClientItemUpdate, DoctorItem, ClientItem
-from auth import get_password_hash
 
-async def create_doctor(db: AsyncSession, data: DoctorItem):
+from auth import get_password_hash
+from database import AppointmentORM, DoctorORM, RoomORM, UserORM
+# from main import request_password_reset
+from model import (
+    DoctorItemCreate,
+    DoctorItemUpdate,
+    RoomItemCreate,
+    UserItemCreate,
+    UserItemUpdate,
+)
+
+
+async def create_doctor(db: AsyncSession, data: DoctorItemCreate) -> DoctorORM:
+    """
+        Create a new doctor in the database.
+
+        Args:
+            db: Async database session
+            data: Validated doctor creation data
+
+        Returns:
+            The newly created doctor record
+
+        Raises:
+            HTTPException: If there's a database integrity error
+                - 409 Conflict for duplicate entries or invalid references
+        """
     hashed_password = get_password_hash(data.password)
     doctor = DoctorORM(name=data.name, surname=data.surname, age=data.age, specialization=data.specialization,
                        category=data.category, password=hashed_password)
-    db.add(doctor)
-    await db.commit()
-    await db.refresh(doctor)
+    try:
+        db.add(doctor)
+        await db.commit()
+        await db.refresh(doctor)
+    except IntegrityError as e:
+        await db.rollback()
+
+        error_msg = "Database integrity error"
+        if "unique constraint" in str(e).lower():
+            error_msg = "Duplicate entry. Doctor with these details already exists"
+        elif "foreign key constraint" in str(e).lower():
+            error_msg = "Invalid reference in foreign key"
+
+        raise HTTPException(
+            status_code=409,
+            detail=error_msg
+        ) from None
     return doctor
 
-async def get_doctors(db: AsyncSession):
-    result = await db.execute(select(DoctorORM))
+
+async def get_doctors(db: AsyncSession, page: int, size: int) -> list[DoctorORM]:
+    """
+        Retrieve a paginated list of doctors from the database.
+
+        Args:
+            db (AsyncSession): The asynchronous database session.
+            page (int): The page number to retrieve (starting from 1).
+            size (int): The number of records per page.
+
+        Returns:
+            List[DoctorORM]: A list of DoctorORM objects corresponding to the requested page.
+
+        Example:
+            doctors = await get_doctors(db_session, page=2, size=10)
+        """
+    result = await db.execute(select(DoctorORM).order_by(DoctorORM.name.asc()).offset((page - 1) * size).limit(size))
     doctors = result.scalars().all()
     return doctors
 
-async def get_doctor(db: AsyncSession, doctor_id: str):
+
+async def get_doctor(db: AsyncSession, doctor_id: UUID) -> DoctorORM:
+    """
+        Retrieve a doctor by their ID from the database.
+
+        Args:
+            db: Async database session
+            doctor_id: UUID of the doctor to retrieve
+
+        Returns:
+            DoctorORM instance if found, None otherwise
+        """
     result = await db.execute(select(DoctorORM).filter(DoctorORM.id == doctor_id))
     doctor = result.scalars().first()
     return doctor
 
-async def update_doctor(db: AsyncSession, doctor_id: int, doctor_update: DoctorItemUpdate):
-    doctor = await get_doctor(db, doctor_id)
-    if not doctor:
-        return None
-    doctor.id = doctor_update.id
-    doctor.name = doctor_update.name
-    doctor.surname = doctor_update.surname
-    doctor.age = doctor_update.age
-    doctor.specialization = doctor_update.specialization
-    doctor.category = doctor_update.category
-    doctor.password = doctor_update.password
-    await db.commit()
-    await db.refresh(doctor)
-    return doctor
 
-async def delete_doctor(db: AsyncSession, doctor_id: int):
+async def update_doctor_dump(db: AsyncSession, doctor_id: UUID, doctor_update: DoctorItemUpdate) -> DoctorORM | None:
+    """
+        Update a doctor's information in the database.
+
+        Args:
+            db: Async database session
+            doctor_id: ID of the doctor to update
+            doctor_update: Validated update data (Pydantic model)
+
+        Returns:
+            Updated DoctorORM instance if found and updated, None if doctor not found
+
+        Raises:
+            HTTPException: If there's a database error during update
+        """
+    db_doctor = await get_doctor(db, doctor_id)
+    if not db_doctor:
+        return None
+
+    update_data = doctor_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_doctor, field, value)
+
+    db.add(db_doctor)
+    await db.commit()
+    await db.refresh(db_doctor)
+    return db_doctor
+
+
+async def delete_doctor(db: AsyncSession, doctor_id: UUID)-> DoctorORM | None:
+    """
+        Delete a doctor record from the database by ID.
+
+        Args:
+            db: Async database session
+            doctor_id: UUID string identifying the doctor to delete
+
+        Returns:
+            The deleted DoctorORM instance if found and deleted,
+            None if no doctor with given ID exists
+
+        Raises:
+            HTTPException:
+                - 404 Not Found if doctor doesn't exist (optional)
+                - 500 Internal Server Error if database operation fails
+        """
     doctor = await get_doctor(db, doctor_id)
     if not doctor:
         return None
@@ -46,42 +144,110 @@ async def delete_doctor(db: AsyncSession, doctor_id: int):
     await db.commit()
     return doctor
 
-async def create_client(db: AsyncSession, data: ClientItem):
-    client = ClientORM(name=data.name, surname=data.surname, email=data.email, age=data.age,
-                       phone=data.phone)
-    db.add(client)
-    await db.commit()
-    await db.refresh(client)
-    return client
 
-async def get_clients(db: AsyncSession):
-    result = await db.execute(select(ClientORM))
-    clients = result.scalars().all()
-    return clients
+async def create_user(db: AsyncSession, data: UserItemCreate):
+    hashed_password = get_password_hash(data.password)
+    user = UserORM(name=data.name, surname=data.surname, email=data.email, age=data.age,
+                       phone=data.phone, role=data.role, password=hashed_password, disabled=False)
+    try:
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+    except IntegrityError as e:
+        await db.rollback()
 
-async def get_client(db: AsyncSession, client_id: str):
-    result = await db.execute(select(ClientORM).filter(ClientORM.id == client_id))
-    client = result.scalars().first()
-    return client
+        error_msg = "Database integrity error"
+        if "unique constraint" in str(e).lower():
+            error_msg = "Duplicate entry. User with these details already exists"
+        elif "foreign key constraint" in str(e).lower():
+            error_msg = "Invalid reference in foreign key"
 
-async def update_client(db: AsyncSession, client_id: str, client_update: ClientItemUpdate):
-    client = await get_client(db, client_id)
-    if not client:
+        raise HTTPException(
+            status_code=409,
+            detail=error_msg
+        ) from None
+    return user
+
+
+async def get_users(db: AsyncSession, page: int, size: int) -> list[UserORM]:
+    result = await db.execute(select(UserORM).order_by(UserORM.name.asc()).offset((page - 1) * size).limit(size))
+    users = result.scalars().all()
+    return users
+
+
+async def get_user(db: AsyncSession, user_id: UUID):
+    result = await db.execute(select(UserORM).filter(UserORM.id == user_id))
+    user = result.scalars().first()
+    return user
+
+
+async def get_user_by_email(db: AsyncSession, user_email: str):
+    result = await db.execute(select(UserORM).filter(UserORM.email == user_email))
+    user = result.scalars().first()
+    return user
+
+
+async def update_user_dump(db: AsyncSession, user_id: UUID, user_update: UserItemUpdate):
+    db_user = await get_user(db, user_id)
+    if not db_user:
         return None
-    client.id = client_update.id
-    client.name = client_update.name
-    client.surname = client_update.surname
-    client.email = client_update.email
-    client.age = client_update.age
-    client.phone = client_update.phone
-    await db.commit()
-    await db.refresh(client)
-    return client
 
-async def delete_client(db: AsyncSession, client_id: int):
-    client = await get_client(db, client_id)
-    if not client:
-        return None
-    await db.delete(client)
+    update_data = user_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_user, field, value)
+
+    db.add(db_user)
     await db.commit()
-    return client
+    await db.refresh(db_user)
+    return db_user
+
+
+async def delete_user(db: AsyncSession, user_id: UUID):
+    user = await get_user(db, user_id)
+    if not user:
+        return None
+    await db.delete(user)
+    await db.commit()
+    return user
+
+
+async def create_room(db: AsyncSession, data: RoomItemCreate):
+    room = RoomORM(number=data.number)
+    try:
+        db.add(room)
+        await db.commit()
+        await db.refresh(room)
+    except IntegrityError as e:
+        await db.rollback()
+
+        error_msg = "Database integrity error"
+        if "unique constraint" in str(e).lower():
+            error_msg = "Duplicate entry. User with these details already exists"
+        elif "foreign key constraint" in str(e).lower():
+            error_msg = "Invalid reference in foreign key"
+
+        raise HTTPException(
+            status_code=409,
+            detail=error_msg
+        ) from None
+    return room
+
+
+async def get_appointments(db: AsyncSession, page: int, size: int) -> list[AppointmentORM]:
+    """
+        Retrieve a paginated list of doctors from the database.
+
+        Args:
+            db (AsyncSession): The asynchronous database session.
+            page (int): The page number to retrieve (starting from 1).
+            size (int): The number of records per page.
+
+        Returns:
+            List[AppointmentORM]: A list of AppointmentORM objects corresponding to the requested page.
+
+        Example:
+            appointments = await get_appointments(db_session, page=2, size=10)
+        """
+    result = await db.execute(select(AppointmentORM).order_by(AppointmentORM.date.asc()).offset((page - 1) * size).limit(size))
+    appointments = result.scalars().all()
+    return appointments

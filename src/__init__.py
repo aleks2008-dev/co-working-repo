@@ -1,4 +1,3 @@
-from database import Base
-from database import DoctorORM, ClientORM, RoomORM, AppointmentORM
+from database import AppointmentORM, Base, DoctorORM, RoomORM, UserORM
 
-__all__ = ("Base", "DoctorORM", "ClientORM", "RoomORM", "AppointmentORM")
+__all__ = ("Base", "DoctorORM", "UserORM", "RoomORM", "AppointmentORM")
