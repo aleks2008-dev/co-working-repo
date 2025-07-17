@@ -58,7 +58,7 @@ class UserORM(Base):
     age: Mapped[int]
     phone: Mapped[str] = mapped_column(unique=True)
     role: Mapped[UserRole] = mapped_column(nullable=False, server_default="user")
-    password: Mapped[str]
+    hashed_password: Mapped[str] = mapped_column(nullable=False)
     disabled: Mapped [bool] = mapped_column(Boolean, default=False)
 
     reset_token: Mapped [str | None] = mapped_column(nullable=True)

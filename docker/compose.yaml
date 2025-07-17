@@ -10,6 +10,7 @@ services:
       dockerfile: docker/Dockerfile
     command: >
       sh -c "
+        python -m smtpd -n -c DebuggingServer 0.0.0.0:1025 &
         alembic upgrade head &&
         uvicorn main:app --host 0.0.0.0 --reload
       "
@@ -17,6 +18,7 @@ services:
       - ../src:/home/alex-user/src
     ports:
       - 8088:8000
+      - 1025:1025
     depends_on:
       - postgres-db
       - postgres-db-test

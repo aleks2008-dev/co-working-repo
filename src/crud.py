@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from pydantic import EmailStr
 
 from auth import get_password_hash
 from database import AppointmentORM, DoctorORM, RoomORM, UserORM
@@ -148,7 +149,7 @@ async def delete_doctor(db: AsyncSession, doctor_id: UUID)-> DoctorORM | None:
 async def create_user(db: AsyncSession, data: UserItemCreate):
     hashed_password = get_password_hash(data.password)
     user = UserORM(name=data.name, surname=data.surname, email=data.email, age=data.age,
-                       phone=data.phone, role=data.role, password=hashed_password, disabled=False)
+                       phone=data.phone, role=data.role, hashed_password=hashed_password, disabled=False)
     try:
         db.add(user)
         await db.commit()
@@ -181,9 +182,9 @@ async def get_user(db: AsyncSession, user_id: UUID):
     return user
 
 
-async def get_user_by_email(db: AsyncSession, user_email: str):
-    result = await db.execute(select(UserORM).filter(UserORM.email == user_email))
-    user = result.scalars().first()
+async def get_user_by_email(db: AsyncSession, user_email: EmailStr):
+    result = await db.execute(select(UserORM).where(UserORM.email == user_email))
+    user = result.scalar_one_or_none()
     return user
 
 
