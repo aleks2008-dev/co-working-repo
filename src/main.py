@@ -1,12 +1,13 @@
 from typing import Annotated
 from uuid import UUID
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from jose import JWTError
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 import crud
 from auth import RoleChecker, create_access_token, get_current_user, verify_password, generate_reset_token, verify_reset_token, send_reset_email, get_password_hash
@@ -106,7 +107,7 @@ async def login(data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = 
 
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверное имя пользователя")
-    if not verify_password(data.password, user.password):
+    if not verify_password(data.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверный пароль")
 
     access_token = create_access_token(subject=str(user.id), role= user.role, email= user.email)
@@ -192,15 +193,14 @@ async def request_password_reset(
     # Генерация токена (действителен 1 час)
     reset_token = generate_reset_token(user.email)
     user.reset_token = reset_token
-    user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+    user_email = user.email
     await db.commit()
-
     # Отправка email (используем FastAPI-Mail)
-    await send_reset_email(user.email, reset_token)
+    await send_reset_email(user_email, reset_token)
     return {"message": "Reset link sent"}
 
 
-# 2. Подтверждение сброса пароля
 @app.post("/password-reset-confirm")
 async def confirm_password_reset(
         form_data: PasswordResetConfirm,
@@ -211,18 +211,19 @@ async def confirm_password_reset(
         email = verify_reset_token(form_data.token)
     except JWTError:
         raise HTTPException(status_code=400, detail="Invalid token")
-
     user = await get_user_by_email(db, email)
+
     if not user or user.reset_token != form_data.token:
         raise HTTPException(status_code=400, detail="Invalid token")
 
-    if datetime.utcnow() > user.reset_token_expires:
-        raise HTTPException(status_code=400, detail="Token expired")
-
     # Обновление пароля
     user.hashed_password = get_password_hash(form_data.new_password)
+    # flag_modified(user, "password")
     user.reset_token = None
     user.reset_token_expires = None
+
+    db.add(user)
     await db.commit()
+    await db.refresh(user)
 
     return {"message": "Password updated successfully"}

@@ -11,6 +11,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import EmailStr
 
 from database import UserORM, get_session
 from model import CurrentUser
@@ -139,8 +140,8 @@ class RoleChecker:
             )
 
 
-def generate_reset_token(email: str) -> str:
-    expires = datetime.utcnow() + timedelta(hours=1)
+def generate_reset_token(email: EmailStr) -> str:
+    expires = datetime.now(timezone.utc) + timedelta(hours=2)
     return jwt.encode(
         {"sub": email, "exp": expires},
         AuthConfig.SECRET_KEY,
@@ -156,11 +157,12 @@ def verify_reset_token(token: str) -> str:
         raise HTTPException(status_code=400, detail="Invalid token")
 
 
-async def send_reset_email(email: str, token: str):
+async def send_reset_email(email: EmailStr, token: str):
     reset_link = f"https://yourapp.com/reset-password?token={token}"
     message = MessageSchema(
         subject="Password Reset",
         recipients=[email],
         body=f"Click to reset: {reset_link}",
+        subtype="plain"
     )
     await FastMail(Settings.email_conf).send_message(message)
